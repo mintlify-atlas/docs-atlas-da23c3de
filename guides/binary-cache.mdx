@@ -50,7 +50,7 @@ mntpack config set binaryCache.repo mntpack/mntpack-index
 ```
 
 <Note>
-  `binaryCache.repo` defaults to the value of `syncDispatch.repo` when left unset. Both default to `"mntpack/mntpack-index"`, so enabling `binaryCache.enabled` alone is sufficient if you are using the standard mntpack index.
+  `binaryCache.repo` has no default of its own — when left unset it falls back to the value of `syncDispatch.repo`, which defaults to `"mntpack/mntpack-index"`. Enabling `binaryCache.enabled` alone is therefore sufficient if you are using the standard mntpack index.
 </Note>
 
 ---

@@ -1,7 +1,7 @@
 ---
 title: "mntpack nuget add, use, and remove Package References"
 sidebarTitle: "add / use / remove"
-description: "Add, replace, or drop NuGet package references in a C# project — with use as the all-in-one path that builds, configures NuGet.config, and restores automatically."
+description: "Manage NuGet package references with add, use, and remove — use handles the full workflow: feed build, NuGet.config setup, reference add, and restore."
 ---
 
 These commands manage NuGet package references inside a C# project. `add` wraps `dotnet add package` with optional restore and build steps. `use` is the preferred high-level command for local-source packages — it ensures the feed is ready, writes `NuGet.config`, adds the reference, and restores in one pass. `remove` wraps `dotnet remove package`. `list`, `apply`, and `restore` operate on declarations stored in `mntpack.json`, letting teams commit their NuGet requirements alongside the rest of the mntpack manifest.
@@ -14,7 +14,7 @@ Adds a NuGet package reference to the target project by running `dotnet add pack
 
 ### Synopsis
 
-```
+```bash
 mntpack nuget add <package> [version]
     [--source <source>]
     [--path <dir>]
@@ -66,7 +66,7 @@ The all-in-one command for consuming local-source packages. `use` performs every
 
 ### Synopsis
 
-```
+```bash
 mntpack nuget use <package> [version]
     [--source <source>]
     [--path <dir>]
@@ -110,7 +110,7 @@ Removes a NuGet package reference from the target project by calling `dotnet rem
 
 ### Synopsis
 
-```
+```bash
 mntpack nuget remove <package>
     [--path <dir>]
     [--project <file>]
@@ -148,7 +148,7 @@ Lists the NuGet package references declared in `mntpack.json` for the project �
 
 ### Synopsis
 
-```
+```bash
 mntpack nuget list [--path <dir>] [--project <file>]
 ```
 
@@ -162,7 +162,7 @@ Reads every entry in the `nuget.packages` list of `mntpack.json` and calls `dotn
 
 ### Synopsis
 
-```
+```bash
 mntpack nuget apply
     [--path <dir>]
     [--project <file>]
@@ -178,7 +178,7 @@ Runs `dotnet restore` on the target project. Accepts the same `--path`, `--proje
 
 ### Synopsis
 
-```
+```bash
 mntpack nuget restore
     [--path <dir>]
     [--project <file>]
@@ -194,7 +194,7 @@ One-shot pipeline: updates all registered source repos, rebuilds their packages 
 
 ### Synopsis
 
-```
+```bash
 mntpack nuget refresh
     [--path <dir>]
     [--project <file>]
@@ -218,7 +218,7 @@ Removes an entry from the global NuGet package cache (`~/.nuget/packages/` on Li
 
 ### Synopsis
 
-```
+```bash
 mntpack nuget cache clear <package> [version]
 ```
 

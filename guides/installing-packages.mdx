@@ -1,7 +1,7 @@
 ---
-title: "Installing GitHub Tools with mntpack sync"
+title: "Installing GitHub Packages with mntpack sync Command"
 sidebarTitle: "Installing Packages"
-description: "Learn how mntpack sync clones, builds, and registers GitHub tools in a content-addressed store — with options for versions, release assets, and global shims."
+description: "Learn how mntpack sync installs GitHub tools: clone, build, and register packages with options for version pinning, release assets, and global shims."
 ---
 
 `mntpack sync` is the primary command for installing developer tools from GitHub. It accepts a repository reference, resolves the source, builds the tool using the appropriate language driver, and registers the package in your local store. The aliases `add` and `install` are fully equivalent — all three map to the same internal command.
@@ -55,7 +55,7 @@ mntpack sync BurntSushi/ripgrep -v 8f3c2a1                   # commit hash (cann
 
 ## Custom Package Names
 
-By default the package is named after the repository. Override this with `--name` when you want a shorter alias or need to avoid a naming conflict.
+By default the package is named after the repository. Override this with `-n`/`--name` when you want a shorter alias or need to avoid a naming conflict.
 
 ```bash
 mntpack sync owner/repo --name mytool

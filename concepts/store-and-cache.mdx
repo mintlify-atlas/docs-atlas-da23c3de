@@ -1,5 +1,5 @@
 ---
-title: "Content-Addressed Store and Git Cache Internals"
+title: "mntpack Store and Cache: SHA-256 Hashing and Git Mirrors"
 sidebarTitle: "Store & Cache"
 description: "Understand how mntpack deduplicates binaries with SHA-256 hashing, manages git mirror caches, and supports lazy builds and remote binary fetching."
 ---
@@ -77,7 +77,8 @@ Rather than cloning a repository directly into a working directory, mntpack firs
 
 ```text
 ~/.mntpack/cache/git/
-  owner__repo.git      ← bare mirror
+  <owner>/
+    <repo>.git         ← bare mirror
 ```
 
 Working directories under `~/.mntpack/repos/<owner>/<repo>` are **linked worktrees** backed by these mirrors. A linked worktree shares the object store of the bare mirror, so switching branches or commits is a metadata operation rather than a full re-clone.

@@ -1,7 +1,7 @@
 ---
-title: "mntpack use — Switch Active Version of a Package"
+title: "mntpack use — Switch the Active Version of a Package"
 sidebarTitle: "use"
-description: "Retarget a package's metadata and global shims to a previously installed version without downloading or building anything new."
+description: "Retarget a package's metadata and global shims to a previously installed version in the store, without downloading or building anything."
 ---
 
 The `use` command switches the active version of an installed package by retargeting the package record and any associated shims to a different version alias in the store. No network requests or build steps are performed — the target version must already exist in `~/.mntpack/store/versions/`. This makes version switching instant.

@@ -1,5 +1,5 @@
 ---
-title: "mntpack remove — Uninstall a Package"
+title: "mntpack remove — Uninstall a Package from the Store"
 sidebarTitle: "remove"
 description: "Delete a package's binary, records, and global shims from the mntpack store, and clean up the cloned repo when no other packages depend on it."
 ---
@@ -9,12 +9,12 @@ The `remove` command uninstalls a package that was previously installed with `sy
 ## Synopsis
 
 ```bash
-mntpack remove <repo_or_package>
+mntpack remove <repo>
 ```
 
 ## Arguments
 
-<ParamField path="repo_or_package" type="string" required>
+<ParamField path="repo" type="string" required>
   The package to remove. Accepts the same forms as `sync`:
   - **Package name** — `ripgrep` (the name registered at install time)
   - **Owner/repo** — `BurntSushi/ripgrep`

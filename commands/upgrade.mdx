@@ -1,7 +1,7 @@
 ---
 title: "mntpack upgrade — Upgrade Packages via Release Assets"
 sidebarTitle: "upgrade"
-description: "Download the latest GitHub release assets for installed packages and update their store entries, without rebuilding from source."
+description: "Download the latest GitHub release assets for installed packages and update their store entries, skipping the source build entirely."
 ---
 
 The `upgrade` command updates installed packages by downloading the latest GitHub release assets — equivalent to running `mntpack sync <repo> -r auto` against each package. This is the release-asset upgrade path. If you want to pull the newest commits and rebuild from source instead, use [`mntpack update`](/commands/update).

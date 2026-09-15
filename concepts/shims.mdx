@@ -1,7 +1,7 @@
 ---
-title: "Global Shims: Expose Tools on Your PATH"
+title: "mntpack Global Shims: Expose Installed Tools on Your PATH"
 sidebarTitle: "Shims"
-description: "How mntpack creates platform-specific shim scripts in ~/.mntpack/bin so installed tools are available everywhere on your PATH."
+description: "How mntpack creates platform-specific shim scripts in ~/.mntpack/bin so installed tools are available everywhere on your PATH without extra setup."
 ---
 
 A shim is a small wrapper script that mntpack writes into `~/.mntpack/bin/` (or `$MNTPACK_HOME/bin/`). When you add that directory to your PATH, every globally-installed tool becomes available as a plain shell command — without copying binaries to system directories or modifying anything outside of `~/.mntpack/`. This page explains how shims are created, how they resolve their targets, and how the `autoUpdateOnRun` setting changes their runtime behaviour.

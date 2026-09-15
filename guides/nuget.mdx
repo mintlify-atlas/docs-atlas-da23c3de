@@ -1,7 +1,7 @@
 ---
-title: 'Managing NuGet Packages with a Local mntpack Feed'
+title: 'NuGet Package Management with a Local mntpack Feed'
 sidebarTitle: 'NuGet Guide'
-description: 'Learn how mntpack builds C# packages from GitHub into a local NuGet feed and wires them into your .NET projects automatically.'
+description: 'Learn how mntpack builds C# packages from GitHub into a local NuGet feed and wires them into your .NET projects automatically using source recipes.'
 ---
 
 mntpack manages a local NuGet feed at `~/.mntpack/nuget/feed/` that lets you build C# packages directly from GitHub source and consume them in any .NET project — no private feed service, no manual `dotnet pack` steps. There are two distinct roles: **source maintainers** who register and build GitHub C# projects into the feed, and **consumers** who declare which packages their project needs and let mntpack wire up `NuGet.config`, add references, and restore.
@@ -93,6 +93,7 @@ mntpack nuget use CS2Luau.Roblox 1.0.0-local.1 --project src/MyApp/MyApp.csproj
   <Tab title="Minimal (three steps)">
     ```bash
     # 1. Write NuGet.config with the mntpack-local source
+    # 'ensure' is an alias for 'init'
     mntpack nuget init
 
     # 2. Add the package reference and update mntpack.json
@@ -181,6 +182,8 @@ Apply the full list to a project at any time with:
 
 ```bash
 mntpack nuget apply --project src/MyApp/MyApp.csproj
+# 'install' is an alias for 'apply'
+mntpack nuget install --project src/MyApp/MyApp.csproj
 ```
 
 ---
@@ -206,11 +209,34 @@ mntpack nuget refresh
 
 # Force rebuild even when the source has not changed
 mntpack nuget refresh --force --build
+
+# Target a specific project file
+mntpack nuget refresh --project src/MyApp/MyApp.csproj --force
 ```
+
+Flags accepted by `mntpack nuget refresh`:
+
+| Flag | Description |
+|---|---|
+| `--path <dir>` | Working directory to use instead of the current directory |
+| `--project <file>` | Path to a specific `.csproj` file |
+| `--force` | Rebuild sources even when the cached artifact is current |
+| `--build` | Explicitly trigger a source build during the refresh |
 
 <Warning>
   `refresh` always clears the global NuGet cache for managed packages. Run it deliberately in CI pipelines to avoid unnecessary network traffic or accidental cache evictions.
 </Warning>
+
+---
+
+## Listing declared packages
+
+`mntpack nuget list` shows the NuGet packages currently declared in `mntpack.json` for the working directory (or the specified project):
+
+```bash
+mntpack nuget list
+mntpack nuget list --project src/MyApp/MyApp.csproj
+```
 
 ---
 

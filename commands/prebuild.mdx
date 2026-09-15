@@ -1,14 +1,14 @@
 ---
 title: "mntpack prebuild — Build and Publish to Binary Cache"
 sidebarTitle: "prebuild"
-description: "Compile a synced package locally, store the result in the content-addressed store, and upload it as a release asset so future installs can skip the build step."
+description: "Compile a synced package, store the binary in the content-addressed store, and push it as a release asset so future installs skip local compilation."
 ---
 
 The `prebuild` command is intended for maintainers and CI pipelines that want to pre-compile a package and make the resulting binary available to other users through the binary cache. Run it inside a repository that mntpack has already synced: it builds the package using the appropriate language driver, records the output in the local content-addressed store at `~/.mntpack/store/sha256/<hash>/`, and then uploads the binary as a GitHub release asset to the repository configured in `binaryCache.repo`. When a subsequent user runs `mntpack sync` for the same package, mntpack checks the cache first and downloads the prebuilt asset instead of compiling from source.
 
 ## Synopsis
 
-```
+```bash
 mntpack prebuild
 ```
 

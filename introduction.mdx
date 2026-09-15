@@ -1,7 +1,7 @@
 ---
 title: 'mntpack: GitHub-Aware Package Manager for Developers'
 sidebarTitle: 'Introduction'
-description: 'mntpack installs developer tools directly from GitHub repositories — building from source or grabbing release assets — with global shims, version switching, and a content-addressed store.'
+description: 'Install any GitHub repo as a developer tool with mntpack: auto-detects language, builds from source or downloads release assets, and creates global shims.'
 ---
 
 mntpack (Mintiler Package Manager) is a GitHub-aware package manager, version manager, and runtime launcher written in Rust. Unlike traditional package managers that only work with tools listed in a curated registry, mntpack lets you install **any GitHub repository** as a developer tool — cloning source code, detecting the language automatically, building with the right driver, and creating a global shim in `~/.mntpack/bin/`. You get the full power of `apt`, `brew`, and `cargo install` in one tool, without needing the author to publish to any registry.
@@ -75,7 +75,7 @@ mntpack detects your project type from the files present in the repository and p
     Detected by `package.json`. Builds with `npm`.
   </Card>
   <Card title=".NET / C#" icon="microsoft">
-    Detected by `*.csproj`, `*.sln`, `*.slnx`, `Directory.Build.props`, or `global.json`. Builds with `dotnet build`.
+    Detected by `*.csproj`, `*.sln`, `*.slnx`, `Directory.Build.props`, `Directory.Build.targets`, or `global.json`. Builds with `dotnet build`.
   </Card>
   <Card title="C / C++" icon="c">
     Detected by `CMakeLists.txt` or `Makefile`. Builds with `cmake` or `make`.

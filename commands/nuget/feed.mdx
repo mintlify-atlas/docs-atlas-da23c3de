@@ -1,7 +1,7 @@
 ---
-title: "mntpack nuget feed — Inspect the Local NuGet Feed"
+title: "mntpack nuget feed — View Local NuGet Feed Contents"
 sidebarTitle: "nuget feed"
-description: "Inspect the mntpack-managed local NuGet feed: print its absolute path or list every .nupkg currently published there for use by dotnet and other NuGet clients."
+description: "Inspect the mntpack-managed local NuGet feed: print its absolute path or list every .nupkg currently published there for dotnet and other NuGet clients."
 ---
 
 The `mntpack nuget feed` subcommands let you introspect the local NuGet feed that mntpack maintains at `~/.mntpack/nuget/feed/`. The feed directory is the single source of truth for all source-backed packages built by `mntpack nuget source build`. Any NuGet client — `dotnet`, the NuGet CLI, Visual Studio, or Rider — can consume packages from this directory by pointing a NuGet source at the path returned by `mntpack nuget feed path`. mntpack itself configures this automatically via `NuGet.config` when you run `mntpack nuget init` or `mntpack nuget use`.
@@ -14,13 +14,13 @@ Prints the absolute filesystem path to the managed local NuGet feed directory. T
 
 ### Synopsis
 
-```
+```bash
 mntpack nuget feed path
 ```
 
 ### Example output
 
-```
+```text
 /home/alice/.mntpack/nuget/feed/
 ```
 
@@ -67,13 +67,13 @@ Lists all `.nupkg` files currently published in the local feed. Use this to conf
 
 ### Synopsis
 
-```
+```bash
 mntpack nuget feed list
 ```
 
 ### Example output
 
-```
+```text
 CS2Luau.Roblox.1.0.0-local.1.nupkg
 Newtonsoft.Json.13.0.3.nupkg
 ```

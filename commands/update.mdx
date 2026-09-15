@@ -1,7 +1,7 @@
 ---
-title: "mntpack update — Pull Latest Commits for Packages"
+title: "mntpack update — Pull the Latest Commits for Packages"
 sidebarTitle: "update"
-description: "Fetch the newest commits from GitHub and rebuild installed packages from source, either one at a time or all at once."
+description: "Fetch the newest commits from GitHub and rebuild installed packages from source using the same language driver, one at a time or all at once."
 ---
 
 The `update` command pulls the latest commits from each package's upstream repository and rebuilds the binary using the same language driver that was used at install time. This is the source-build update path — it fetches commits and compiles. If you installed a package via a release asset and want to stay on the release-asset upgrade path, use [`mntpack upgrade`](/commands/upgrade) instead.

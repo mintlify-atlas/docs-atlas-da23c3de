@@ -1,5 +1,5 @@
 ---
-title: "Diagnosing and Repairing mntpack with doctor"
+title: "mntpack doctor: Diagnose and Repair Your Installation"
 sidebarTitle: "Doctor"
 description: "Use mntpack doctor to audit tool paths, shim integrity, and installed package state — then pass --fix to automatically repair common issues."
 ---
@@ -16,7 +16,7 @@ mntpack doctor
 
 Sample output:
 
-```
+```text
 root        /home/alice/.mntpack
 config      /home/alice/.mntpack/config.json
 bin         /home/alice/.mntpack/bin
@@ -54,7 +54,7 @@ When `--fix` is active, doctor:
 
 The final line reports how many items were repaired:
 
-```
+```text
 fixed   3
 ```
 

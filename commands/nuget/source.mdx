@@ -1,7 +1,7 @@
 ---
 title: "mntpack nuget source — Register GitHub C# Repos as Packages"
 sidebarTitle: "nuget source"
-description: "Register GitHub C# repositories as source-backed NuGet package recipes, then clone, build, and publish them into the local mntpack feed with nuget source build."
+description: "Register GitHub C# repositories as source-backed NuGet recipes and publish built packages to the local feed with source build or source build-all."
 ---
 
 `mntpack nuget source` manages the source-backed package recipes stored in `mntpack.json` under the `nugetSources` key. Each recipe tells mntpack where to find a GitHub C# repository, which project or solution file to build, and what NuGet package ID and version to assign the resulting `.nupkg`. When a recipe is built, mntpack clones (or updates) the repository, runs `dotnet restore`, `dotnet build`, and `dotnet pack`, and publishes the output into the managed local feed at `~/.mntpack/nuget/feed/`. From that point on, any project whose `NuGet.config` includes `mntpack-local` can resolve the package.
@@ -14,7 +14,7 @@ Registers a new source-backed package recipe in `mntpack.json`. Does not clone o
 
 ### Synopsis
 
-```
+```bash
 mntpack nuget source add <name>
     --repo <owner/repo|url>
     [--ref <ref>]
@@ -101,7 +101,7 @@ Lists all source-backed package recipes registered in `mntpack.json` for the tar
 
 ### Synopsis
 
-```
+```bash
 mntpack nuget source list [--path <dir>]
 ```
 
@@ -113,7 +113,7 @@ Clones or updates the registered repository for a single recipe, then runs `dotn
 
 ### Synopsis
 
-```
+```bash
 mntpack nuget source build <name> [--path <dir>] [--force]
 ```
 
@@ -137,7 +137,7 @@ Builds every recipe registered in `mntpack.json` into the local feed. Equivalent
 
 ### Synopsis
 
-```
+```bash
 mntpack nuget source build-all [--path <dir>] [--force]
 ```
 
@@ -149,7 +149,7 @@ Fetches the latest commits for a single registered source repository without reb
 
 ### Synopsis
 
-```
+```bash
 mntpack nuget source update <name> [--path <dir>]
 ```
 
@@ -161,7 +161,7 @@ Fetches the latest commits for all registered source repositories. Use `source s
 
 ### Synopsis
 
-```
+```bash
 mntpack nuget source sync [--path <dir>] [--force]
 ```
 

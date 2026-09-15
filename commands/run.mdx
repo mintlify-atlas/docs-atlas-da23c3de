@@ -1,10 +1,10 @@
 ---
-title: "mntpack run — Launch an Installed Package"
+title: "mntpack run — Execute an Installed Package by Name"
 sidebarTitle: "run"
-description: "Execute an installed mntpack package by name, with optional auto-update and on-demand lazy build. Hyphen-prefixed flags pass through directly without a separator."
+description: "Execute an installed mntpack package by name, passing any arguments directly to the binary. Supports auto-update before launch and lazy on-demand build."
 ---
 
-The `run` command is how you launch a package that has already been synced by mntpack. It handles everything between you and the binary: if the `autoUpdateOnRun` config option is enabled, it performs a sync first so you're always running the latest upstream commit. If build artifacts are missing — because the package was cloned but not yet compiled — `run` triggers a lazy prepare and build on demand before handing off execution. Because `allow_hyphen_values` is set on the trailing-args slot, you can pass flags like `--help` or `--verbose` directly without the `--` separator.
+The `run` command is how you launch a package that has already been synced by mntpack. It handles everything between you and the binary: if the `autoUpdateOnRun` config option is enabled, it performs a sync first so you're always running the latest upstream commit. If build artifacts are missing — because the package was cloned but not yet compiled — `run` triggers a lazy prepare and build on demand before handing off execution. Because `allow_hyphen_values` is set on the trailing-args slot, you can pass flags like `--help` or `--verbose` directly without the `--` separator. mntpack's own `--help` flag is disabled for this command (`disable_help_flag = true`), so `--help` is never intercepted by mntpack and always passes through to the package.
 
 ## Synopsis
 

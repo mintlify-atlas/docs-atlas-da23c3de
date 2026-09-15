@@ -1,14 +1,14 @@
 ---
-title: "mntpack config — Read and Write Configuration"
+title: "mntpack config — Manage Configuration Keys and Values"
 sidebarTitle: "config"
-description: "Inspect and modify every setting in ~/.mntpack/config.json using dot-notation keys, from tool paths and default owner to binary cache and sync dispatch settings."
+description: "Inspect and modify mntpack settings with dot-notation keys: show, get, or set any value in ~/.mntpack/config.json, or reset all keys to factory defaults."
 ---
 
 The `config` command gives you direct access to `~/.mntpack/config.json` without needing to open the file in a text editor. You can print the entire configuration, read or write individual keys using dot-notation for nested fields, or restore every setting to its factory default. Changes take effect immediately on the next mntpack command — no restart or reload is required.
 
 ## Synopsis
 
-```
+```bash
 mntpack config show
 mntpack config get <key>
 mntpack config set <key> <value>
