@@ -1,0 +1,66 @@
+---
+title: "mntpack reinstall — Remove and Reinstall a Package"
+sidebarTitle: "reinstall"
+description: "Wipe an existing package installation and run a clean sync in one step, with full control over version, release asset, name, and global shim."
+---
+
+The `reinstall` command removes an already-installed package and immediately performs a fresh `sync`. This is useful when an installation is in a broken state, when you want to switch between a source build and a release asset, or when you need to change the package name or global-shim setting without going through separate `remove` and `sync` invocations. Also available as `resync`.
+
+## Synopsis
+
+```bash
+mntpack reinstall <package> [-v <version>] [-r <asset|auto>] [-n <name>] [-g]
+```
+
+## Arguments and Flags
+
+<ParamField path="package" type="string" required>
+  The name of the installed package to reinstall. This is the package name registered at the time of the original `sync`, not necessarily the repository name.
+</ParamField>
+
+<ParamField path="-v, --version" type="string">
+  Tag or commit hash to check out during the fresh sync. When combined with `-r/--release`, must be a tag — commit hashes are not accepted.
+</ParamField>
+
+<ParamField path="-r, --release" type="string">
+  Release asset to download instead of building from source. Use `auto` to let mntpack select the best asset for your OS and architecture automatically, or provide an exact asset filename.
+</ParamField>
+
+<ParamField path="-n, --name" type="string">
+  Custom package name to use for the reinstalled package. If omitted, the repository name is used as default.
+</ParamField>
+
+<ParamField path="-g, --global" type="boolean">
+  Create a global shim in `~/.mntpack/bin/` after the reinstall completes.
+</ParamField>
+
+## Behavior
+
+`reinstall` is equivalent to running `mntpack remove <package>` followed immediately by `mntpack sync <repo>` with the same flags. The full sync pipeline runs after removal — mirror update, worktree checkout, driver detection, build or asset download, store write, package record creation, and optional shim placement.
+
+<Note>
+  If you pass `-v` and `-r` together, `-v` must be a tag. Providing a commit hash alongside `--release` will cause an error, the same as with `sync`.
+</Note>
+
+<Warning>
+  The `mntpack` package cannot be reinstalled via this command — it is a protected package name.
+</Warning>
+
+## Examples
+
+```bash
+# Reinstall to the latest commit, same settings
+mntpack reinstall ripgrep
+
+# Using the resync alias
+mntpack resync ripgrep
+
+# Reinstall a specific version using release asset auto-detection
+mntpack reinstall ripgrep -v 14.1.0 -r auto
+
+# Reinstall from source at a pinned tag with a global shim
+mntpack reinstall ripgrep -v 14.1.0 -g
+
+# Reinstall with a new custom name
+mntpack reinstall ripgrep --name rg -g
+```

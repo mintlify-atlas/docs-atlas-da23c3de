@@ -1,0 +1,43 @@
+---
+title: "mntpack search — Search GitHub for Installable Tools"
+sidebarTitle: "search"
+description: "Query GitHub repository search for developer tools and libraries that mntpack can install. Accepts one or more space-separated keywords."
+---
+
+The `search` command sends a repository search query to GitHub and surfaces results that are candidates for installation with `mntpack sync`. You can pass one or more keywords as separate arguments — mntpack joins them into a single query before forwarding to GitHub's search API. This makes it easy to discover tools by describing what you're looking for in plain language, without needing to know the exact owner or repository name upfront. Once you've identified a repository you want to install, copy the `owner/repo` slug and pass it directly to `mntpack sync`.
+
+## Synopsis
+
+```bash
+mntpack search <query...>
+```
+
+## Parameters
+
+<ParamField path="query" type="string[]" required>
+  One or more search terms. Multiple words are accepted as separate arguments and are joined into a single query sent to GitHub repository search. At least one term is required.
+</ParamField>
+
+<Note>
+  Search results reflect GitHub's repository search index and ranking. Results are not filtered to packages that mntpack has previously indexed — any public GitHub repository that matches your query may appear.
+</Note>
+
+## Examples
+
+```bash
+# Search for a JSON parsing tool
+mntpack search json parser
+
+# Search for an HTTP client written in Rust
+mntpack search rust http client
+
+# Single-term search
+mntpack search ripgrep
+
+# Multi-word search for a specific domain
+mntpack search markdown to html converter
+```
+
+<Tip>
+  Once you find a repository you want to install, use its `owner/repo` slug with `mntpack inspect owner/repo` to preview the detected project type and build hints before committing to a full install with `mntpack sync owner/repo`.
+</Tip>

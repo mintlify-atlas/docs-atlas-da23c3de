@@ -1,0 +1,68 @@
+---
+title: "mntpack inspect — Preview Installability of a Repo"
+sidebarTitle: "inspect"
+description: "Detect the project type, build hints, binary paths, and manifest info for a GitHub repo before committing to a full install with mntpack sync."
+---
+
+The `inspect` command performs a dry-run analysis of a GitHub repository: it clones or fetches the repository, runs the language-driver detection logic, and reports what mntpack would do if you ran `mntpack sync` on it — all without actually installing the package or creating any shims. Use `inspect` to verify that mntpack recognises the project type correctly, understand which build command would be used, preview the expected binary paths, and review any `mntpack.json` manifest fields before committing to a full install.
+
+## Synopsis
+
+```bash
+mntpack inspect <repo>
+```
+
+## Parameters
+
+<ParamField path="repo" type="string" required>
+  The repository to inspect. Accepts any of the input formats supported by `mntpack sync`:
+  - `repo` — shorthand resolved against `defaultOwner` from config
+  - `owner/repo` — full GitHub repository reference
+  - `https://github.com/owner/repo.git` — full GitHub URL
+</ParamField>
+
+## Output
+
+`inspect` surfaces the following information without performing an install:
+
+<AccordionGroup>
+  <Accordion title="Detected project type">
+    The language driver that mntpack would use, determined by the presence of driver-specific files:
+    - **Rust** — `Cargo.toml`
+    - **Python** — `requirements.txt` or `pyproject.toml`
+    - **Node.js** — `package.json`
+    - **.NET / C#** — `*.csproj`, `*.sln`, `*.slnx`, `Directory.Build.props`, or `global.json`
+    - **C/C++** — `CMakeLists.txt` or `Makefile`
+    - **Generic** — `mntpack.json` with `run`/`bin` fields
+  </Accordion>
+  <Accordion title="Build and run hints">
+    The build command that would be executed (e.g. `cargo build --release`, `dotnet build`, `cmake`) and the `run` command from `mntpack.json` if present.
+  </Accordion>
+  <Accordion title="Expected binary paths">
+    Where mntpack expects to find the compiled binary after a successful build, and where it would be linked in the content-addressed store at `~/.mntpack/store/sha256/<hash>/`.
+  </Accordion>
+  <Accordion title="Manifest info">
+    If the repository contains a `mntpack.json`, its fields (`name`, `version`, `dependencies`, `run`, `bin`, `release`, etc.) are shown.
+  </Accordion>
+</AccordionGroup>
+
+<Note>
+  `inspect` may clone or fetch the repository into the git mirror cache at `~/.mntpack/cache/git/` in order to read its contents, but it does not create any entry in `packages/` and does not build anything.
+</Note>
+
+## Examples
+
+```bash
+# Inspect a well-known Rust project
+mntpack inspect BurntSushi/ripgrep
+
+# Inspect using a generic owner/repo reference
+mntpack inspect owner/repo
+
+# Inspect using a shorthand (resolves via defaultOwner config)
+mntpack inspect scalf
+```
+
+<Tip>
+  After inspecting a repository and confirming it looks correct, install it permanently with `mntpack sync owner/repo` — optionally adding `-g` to create a global shim.
+</Tip>

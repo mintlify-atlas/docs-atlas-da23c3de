@@ -1,0 +1,59 @@
+---
+title: "mntpack info — Show Details for an Installed Package"
+sidebarTitle: "info"
+description: "Display the full installation record for a package: repo, version, commit, binary hash, store path, shim paths, and detected driver type."
+---
+
+The `info` command prints a comprehensive summary of everything mntpack knows about an installed package. This is the fastest way to answer questions like "which commit is installed?", "where is the binary stored?", and "what language driver was used to build this?". The output pulls directly from the package record written during `mntpack sync`, so it reflects the state at installation time and is always accurate even if the upstream repository has since moved forward.
+
+## Synopsis
+
+```bash
+mntpack info <package>
+```
+
+## Parameters
+
+<ParamField path="package" type="string" required>
+  The name of the installed package to inspect. This is the package name as tracked by mntpack (shown by `mntpack list`), which defaults to the repository name unless a custom name was specified with `--name` during sync.
+</ParamField>
+
+## Output Fields
+
+The output includes the following information about the package:
+
+<AccordionGroup>
+  <Accordion title="Package name and repository">
+    The registered package name and the source GitHub repository (`owner/repo` or full URL) it was synced from.
+  </Accordion>
+  <Accordion title="Installed version / commit">
+    The version tag or full commit SHA that is currently installed. For packages synced without `-v`, this is the HEAD commit at the time of the last sync.
+  </Accordion>
+  <Accordion title="Binary hash and store path">
+    The SHA-256 content hash of the installed binary and its full path within the content-addressed store at `~/.mntpack/store/sha256/<hash>/<binary>`.
+  </Accordion>
+  <Accordion title="Shim paths">
+    All shim entries in `~/.mntpack/bin/` that resolve to this package, including shims created by `-g/--global`.
+  </Accordion>
+  <Accordion title="Driver type">
+    The language driver that was used to build the package: Rust (`Cargo.toml`), Python (`requirements.txt`/`pyproject.toml`), Node.js (`package.json`), .NET/C# (`*.csproj`/`*.sln`), C/C++ (`CMakeLists.txt`/`Makefile`), or Generic (`mntpack.json`).
+  </Accordion>
+</AccordionGroup>
+
+<Note>
+  `info` reads from the stored package record and does not contact GitHub. To check whether a newer upstream commit is available, use [`mntpack outdated`](/commands/outdated).
+</Note>
+
+## Examples
+
+```bash
+# Show full details for an installed package
+mntpack info ripgrep
+
+# Inspect a package installed with a custom name
+mntpack info mytool
+```
+
+<Tip>
+  If you're trying to find which package provides a specific command or shim name (rather than looking up a package by name), use [`mntpack which <command>`](/commands/which) instead.
+</Tip>

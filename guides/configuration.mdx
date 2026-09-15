@@ -1,0 +1,214 @@
+---
+title: 'Configuring mntpack with config.json'
+sidebarTitle: 'Configuration'
+description: 'A complete reference for every mntpack config key, its type and default value, and the CLI commands used to inspect and change settings.'
+---
+
+mntpack stores all persistent settings in a single JSON file at `~/.mntpack/config.json`. The file is created with sensible defaults on first run, so you never need to edit it manually — the `mntpack config` subcommands let you read and write individual keys without touching the file directly.
+
+## Config file location
+
+The config file lives inside the mntpack root directory:
+
+```text
+~/.mntpack/config.json
+```
+
+Set the `MNTPACK_HOME` environment variable to move the entire mntpack root (and therefore `config.json`) to a different path:
+
+```bash
+export MNTPACK_HOME=/opt/mntpack
+# Config is now at /opt/mntpack/config.json
+```
+
+<Note>
+  `MNTPACK_HOME` overrides the root directory entirely — all subdirectories (`store/`, `bin/`, `repos/`, `nuget/`, etc.) are also relocated. Set it in your shell profile to make the change permanent.
+</Note>
+
+---
+
+## Managing config from the CLI
+
+<CodeGroup>
+  ```bash Show all settings
+  mntpack config show
+  ```
+
+  ```bash Read one key
+  mntpack config get defaultOwner
+  mntpack config get autoUpdateOnRun
+  mntpack config get paths.cmake
+  ```
+
+  ```bash Write a key
+  mntpack config set defaultOwner myorg
+  mntpack config set autoUpdateOnRun true
+  mntpack config set paths.cmake /usr/local/bin/cmake
+  ```
+
+  ```bash Reset to defaults
+  mntpack config reset
+  ```
+</CodeGroup>
+
+Nested keys use dot notation (`paths.cmake`, `binaryCache.enabled`, `syncDispatch.tokenEnv`). Values are written as plain strings; mntpack coerces them to the correct type (bool, string, or null) based on the key definition.
+
+---
+
+## All config keys
+
+### General
+
+<ParamField body="defaultOwner" type="string" default="mntpack">
+  The GitHub owner (user or organisation) used when a repo input has no owner prefix. For example, `mntpack sync scalf` resolves to `mntpack/scalf` when `defaultOwner` is `"mntpack"`.
+</ParamField>
+
+<ParamField body="autoUpdateOnRun" type="boolean" default="false">
+  When `true`, shims and `mntpack run` trigger a sync before launching the package binary. Useful on developer machines where you always want the latest commit; leave `false` in CI or production environments.
+</ParamField>
+
+---
+
+### Tool paths (`paths.*`)
+
+mntpack invokes external tools (compilers, package managers, VCS) by name. Override any of these if the tool is not on `PATH` or you need to pin a specific version.
+
+| Key | Default | Description |
+|---|---|---|
+| `paths.git` | `"git"` | Path to the `git` executable |
+| `paths.python` | `"python"` | Path to the Python interpreter |
+| `paths.pip` | `"pip"` | Path to `pip` |
+| `paths.node` | `"node"` | Path to the Node.js runtime |
+| `paths.npm` | `"npm"` | Path to `npm` |
+| `paths.cargo` | `"cargo"` | Path to the Rust toolchain's `cargo` |
+| `paths.dotnet` | `"dotnet"` | Path to the .NET SDK CLI |
+| `paths.cmake` | `"cmake"` | Path to `cmake` |
+| `paths.make` | `"make"` | Path to `make` |
+
+Set a custom path for any tool:
+
+```bash
+mntpack config set paths.dotnet /usr/local/share/dotnet/dotnet
+mntpack config set paths.cmake /opt/homebrew/bin/cmake
+mntpack config set paths.python python3
+```
+
+<Tip>
+  Run `mntpack doctor` to check whether each configured tool path is reachable. Use `mntpack doctor --fix` to attempt automatic corrections.
+</Tip>
+
+---
+
+### Binary cache (`binaryCache.*`)
+
+The binary cache allows pre-built binaries to be shared via a GitHub repository so install skips the local build step.
+
+<ParamField body="binaryCache.enabled" type="boolean" default="false">
+  When `true`, mntpack checks the configured cache repository for a matching pre-built binary before falling back to upstream release assets or a local build.
+</ParamField>
+
+<ParamField body="binaryCache.repo" type="string" default="null">
+  The GitHub repository (`owner/repo`) that hosts pre-built `.tar.xz` release assets. When not set, this falls back to the value of `syncDispatch.repo` (which defaults to `"mntpack/mntpack-index"`).
+</ParamField>
+
+```bash
+mntpack config set binaryCache.enabled true
+mntpack config set binaryCache.repo myorg/tool-cache
+```
+
+---
+
+### Sync dispatch (`syncDispatch.*`)
+
+Sync dispatch fires a GitHub `repository_dispatch` event after a successful `mntpack sync`, enabling automated CI/CD pipelines that build and publish binaries to the cache.
+
+<ParamField body="syncDispatch.enabled" type="boolean" default="false">
+  When `true`, mntpack sends a `repository_dispatch` HTTP request to `syncDispatch.repo` after every successful sync.
+</ParamField>
+
+<ParamField body="syncDispatch.repo" type="string" default="mntpack/mntpack-index">
+  The GitHub repository that receives the dispatch event. Also used as the fallback value for `binaryCache.repo` when that key is unset.
+</ParamField>
+
+<ParamField body="syncDispatch.tokenEnv" type="string" default="MNTPACK_SYNC_DISPATCH_TOKEN">
+  The name of the environment variable that holds the GitHub personal access token used to authenticate the dispatch request. The token itself is never written to `config.json`.
+</ParamField>
+
+<ParamField body="syncDispatch.eventType" type="string" default="mntpack_sync">
+  The `event_type` string included in the `repository_dispatch` payload. Use this to route events to specific workflow triggers in the target repository.
+</ParamField>
+
+```bash
+mntpack config set syncDispatch.enabled true
+mntpack config set syncDispatch.repo myorg/mntpack-cache
+mntpack config set syncDispatch.tokenEnv MY_DISPATCH_TOKEN
+mntpack config set syncDispatch.eventType mntpack_sync
+```
+
+---
+
+## Full default `config.json`
+
+The following is what mntpack writes when `config.json` does not yet exist:
+
+```json
+{
+  "defaultOwner": "mntpack",
+  "autoUpdateOnRun": false,
+  "paths": {
+    "git": "git",
+    "python": "python",
+    "pip": "pip",
+    "node": "node",
+    "npm": "npm",
+    "cargo": "cargo",
+    "dotnet": "dotnet",
+    "cmake": "cmake",
+    "make": "make"
+  },
+  "binaryCache": {
+    "enabled": false,
+    "repo": null
+  },
+  "syncDispatch": {
+    "enabled": false,
+    "repo": "mntpack/mntpack-index",
+    "tokenEnv": "MNTPACK_SYNC_DISPATCH_TOKEN",
+    "eventType": "mntpack_sync"
+  }
+}
+```
+
+<Warning>
+  `mntpack config reset` overwrites `config.json` with the defaults shown above. All custom values — including custom tool paths and cache settings — will be lost. There is no undo.
+</Warning>
+
+---
+
+## Quick-reference examples
+
+```bash
+# See everything at once
+mntpack config show
+
+# Set the default GitHub owner
+mntpack config get defaultOwner
+mntpack config set defaultOwner myorg
+
+# Enable auto-update before every run
+mntpack config set autoUpdateOnRun true
+
+# Point to a non-standard cmake installation
+mntpack config set paths.cmake /usr/local/bin/cmake
+
+# Enable the binary cache
+mntpack config set binaryCache.enabled true
+mntpack config set binaryCache.repo myorg/tool-cache
+
+# Enable sync dispatch with a custom token env var
+mntpack config set syncDispatch.enabled true
+mntpack config set syncDispatch.tokenEnv GITHUB_DISPATCH_TOKEN
+
+# Reset everything to defaults
+mntpack config reset
+```

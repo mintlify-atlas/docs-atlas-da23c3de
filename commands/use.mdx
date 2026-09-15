@@ -1,0 +1,58 @@
+---
+title: "mntpack use — Switch Active Version of a Package"
+sidebarTitle: "use"
+description: "Retarget a package's metadata and global shims to a previously installed version without downloading or building anything new."
+---
+
+The `use` command switches the active version of an installed package by retargeting the package record and any associated shims to a different version alias in the store. No network requests or build steps are performed — the target version must already exist in `~/.mntpack/store/versions/`. This makes version switching instant.
+
+## Synopsis
+
+```bash
+mntpack use <package> <version>
+```
+
+## Arguments
+
+<ParamField path="package" type="string" required>
+  The name of the installed package whose active version you want to change.
+</ParamField>
+
+<ParamField path="version" type="string" required>
+  The version tag or commit prefix to activate. Supports **prefix matching** — you can pass `14` to match `14.1.0` as long as it is unambiguous. The version must have been previously installed via `mntpack sync -v <version>`.
+</ParamField>
+
+## Behavior
+
+When you install a package multiple times with different `-v` values, mntpack stores each build separately under `~/.mntpack/store/versions/<owner>/<repo>/<version>/`. The `use` command updates the package record to point to the selected version alias and rewrites any global shims to route through that version. The previously active version remains in the store and can be switched back to at any time.
+
+<Note>
+  The version you pass to `use` must have been previously installed. mntpack does not download or build anything — it only switches between versions already present in the store. To add a new version, run `mntpack sync <repo> -v <version>` first.
+</Note>
+
+<Tip>
+  To run a one-off command with a specific version **without** switching the active version, use `mntpack exec <package>@<version>` instead. For example: `mntpack exec ripgrep@13 -- --version`.
+</Tip>
+
+## Examples
+
+```bash
+# Install two versions of the same package
+mntpack sync BurntSushi/ripgrep -v 13.0.0
+mntpack sync BurntSushi/ripgrep -v 14.1.0
+
+# Switch to 14.x (prefix matching)
+mntpack use ripgrep 14
+
+# Switch back to 13.0.0 exactly
+mntpack use ripgrep 13.0.0
+```
+
+<CardGroup cols={2}>
+  <Card title="exec" icon="terminal" href="/commands/exec">
+    Run a specific version once without changing the active version
+  </Card>
+  <Card title="sync" icon="download" href="/commands/sync">
+    Install a new version of a package with `-v`
+  </Card>
+</CardGroup>

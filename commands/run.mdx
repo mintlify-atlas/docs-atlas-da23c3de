@@ -1,0 +1,81 @@
+---
+title: "mntpack run — Launch an Installed Package"
+sidebarTitle: "run"
+description: "Execute an installed mntpack package by name, with optional auto-update and on-demand lazy build. Hyphen-prefixed flags pass through directly without a separator."
+---
+
+The `run` command is how you launch a package that has already been synced by mntpack. It handles everything between you and the binary: if the `autoUpdateOnRun` config option is enabled, it performs a sync first so you're always running the latest upstream commit. If build artifacts are missing — because the package was cloned but not yet compiled — `run` triggers a lazy prepare and build on demand before handing off execution. Because `allow_hyphen_values` is set on the trailing-args slot, you can pass flags like `--help` or `--verbose` directly without the `--` separator.
+
+## Synopsis
+
+```bash
+mntpack run <package> [args...]
+```
+
+## Parameters
+
+<ParamField path="package" type="string" required>
+  The name of the installed package to launch. Matches the package name shown by `mntpack list`, not the repository name (though they are often the same).
+</ParamField>
+
+<ParamField path="args" type="string[]">
+  Arguments forwarded verbatim to the package binary or its `run` command defined in `mntpack.json`. Hyphen-prefixed flags (e.g. `--help`, `-v`) are accepted directly without a `--` separator, though you may still use `--` for clarity.
+</ParamField>
+
+## Behavior
+
+<Steps>
+  <Step title="Auto-update check">
+    When `autoUpdateOnRun` is `true` in `~/.mntpack/config.json`, mntpack runs `sync` for this package before executing it — ensuring you always launch the latest upstream version.
+  </Step>
+  <Step title="Lazy build on missing artifacts">
+    If the package was cloned but not yet compiled (deferred preparation), `run` detects missing build artifacts and performs the build on-demand before proceeding.
+  </Step>
+  <Step title="Command resolution">
+    If the package's `mntpack.json` defines a `run` field, that command is used to launch the package. Otherwise, mntpack executes the stored binary directly from the content-addressed store at `~/.mntpack/store/sha256/<hash>/<binary>`.
+  </Step>
+  <Step title="Execution">
+    The resolved command is launched with any forwarded `args` appended.
+  </Step>
+</Steps>
+
+<Note>
+  Global shims created with `mntpack sync -g` route through `mntpack run <package>` automatically when `autoUpdateOnRun` is enabled, so calling the shim directly has the same auto-update behaviour as calling `mntpack run` explicitly.
+</Note>
+
+<Tip>
+  To enable auto-update globally, run:
+  ```bash
+  mntpack config set autoUpdateOnRun true
+  ```
+</Tip>
+
+## Examples
+
+```bash
+# Launch an installed package
+mntpack run mytool
+
+# Pass arguments after the optional -- separator
+mntpack run mytool -- --flag value
+
+# Hyphen-prefixed flags work directly (no -- needed)
+mntpack run mytool --help
+
+# Run with multiple forwarded arguments
+mntpack run ripgrep pattern src/
+```
+
+<CodeGroup>
+```bash With auto-update enabled
+# config.json: "autoUpdateOnRun": true
+# mntpack syncs first, then runs
+mntpack run mytool
+```
+
+```bash With mntpack.json run field
+# mntpack.json: { "run": "php asm.php" }
+# mntpack executes "php asm.php" with forwarded args
+mntpack run php-asm -- input.php
+```
+</CodeGroup>

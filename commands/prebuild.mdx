@@ -1,0 +1,91 @@
+---
+title: "mntpack prebuild — Build and Publish to Binary Cache"
+sidebarTitle: "prebuild"
+description: "Compile a synced package locally, store the result in the content-addressed store, and upload it as a release asset so future installs can skip the build step."
+---
+
+The `prebuild` command is intended for maintainers and CI pipelines that want to pre-compile a package and make the resulting binary available to other users through the binary cache. Run it inside a repository that mntpack has already synced: it builds the package using the appropriate language driver, records the output in the local content-addressed store at `~/.mntpack/store/sha256/<hash>/`, and then uploads the binary as a GitHub release asset to the repository configured in `binaryCache.repo`. When a subsequent user runs `mntpack sync` for the same package, mntpack checks the cache first and downloads the prebuilt asset instead of compiling from source.
+
+## Synopsis
+
+```
+mntpack prebuild
+```
+
+No arguments or flags are accepted. All configuration is read from `~/.mntpack/config.json`.
+
+## Prerequisites
+
+Before running `prebuild`, ensure the following are in place:
+
+<Steps>
+  <Step title="Enable the binary cache">
+    Set `binaryCache.enabled` to `true` in your mntpack configuration:
+
+    ```bash
+    mntpack config set binaryCache.enabled true
+    ```
+  </Step>
+  <Step title="Configure the cache repository">
+    Set `binaryCache.repo` to the `owner/repo` that will receive the uploaded release assets. If this key is unset, mntpack falls back to `syncDispatch.repo` (default: `mntpack/mntpack-index`):
+
+    ```bash
+    mntpack config set binaryCache.repo myorg/my-cache-repo
+    ```
+  </Step>
+  <Step title="Provide a GitHub token">
+    Export a GitHub personal access token with release write permissions. mntpack reads the token from the environment variable named by `syncDispatch.tokenEnv` (default: `MNTPACK_SYNC_DISPATCH_TOKEN`):
+
+    ```bash
+    export MNTPACK_SYNC_DISPATCH_TOKEN=ghp_...
+    ```
+  </Step>
+  <Step title="Sync the package">
+    The target repository must already be synced so mntpack knows how to build it:
+
+    ```bash
+    mntpack sync owner/repo
+    ```
+  </Step>
+</Steps>
+
+## How It Works
+
+<Steps>
+  <Step title="Build">
+    mntpack invokes the language driver appropriate for the repository (Rust, Python, Node.js, .NET, C/C++, or Generic) to produce a binary from source.
+  </Step>
+  <Step title="Store">
+    The compiled binary is written to the content-addressed store: `~/.mntpack/store/sha256/<hash>/<binary>`. The hash is derived from the binary content, so identical builds produce the same path.
+  </Step>
+  <Step title="Upload">
+    mntpack uploads the binary as a release asset to `binaryCache.repo` on GitHub, tagged by hash. Future invocations of `mntpack sync` for the same package and version will find this asset and skip local compilation.
+  </Step>
+</Steps>
+
+## Examples
+
+```bash
+# Inside a repository that mntpack has already synced
+mntpack prebuild
+```
+
+```bash
+# Full workflow: configure, sync, then prebuild
+mntpack config set binaryCache.enabled true
+mntpack config set binaryCache.repo myorg/my-cache-repo
+mntpack sync myorg/mytool
+mntpack prebuild
+```
+
+<Note>
+  `prebuild` must be run from a directory that corresponds to a package mntpack has synced. If the package has not been synced first, mntpack will not have the repository source available to build.
+</Note>
+
+<Warning>
+  The GitHub token must have **write** access to releases on `binaryCache.repo`. Using a fine-grained token scoped to only that repository is recommended.
+</Warning>
+
+<Tip>
+  For full binary cache setup instructions, including how to configure a shared cache repository for a team, see the [binary cache guide](/guides/binary-cache).
+</Tip>

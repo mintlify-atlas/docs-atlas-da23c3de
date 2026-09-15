@@ -1,0 +1,73 @@
+---
+title: "mntpack exec — Run a Repo or Version Ephemerally"
+sidebarTitle: "exec"
+description: "Run a GitHub repo without a permanent install, or execute a specific installed version without changing the active version pointer."
+---
+
+The `exec` command covers two complementary scenarios: running a repository you haven't installed yet, and running a specific installed version of a package without disturbing whichever version is currently active. In the first mode, you pass an `owner/repo` reference and mntpack fetches, builds, and runs it in an isolated ephemeral context — nothing is permanently recorded under `packages/` and no global shims are created. In the second mode, you use the `package@version` syntax to target an exact version that was previously installed via `mntpack sync -v`, allowing you to compare versions or run a pinned release without calling `mntpack use` to switch the active pointer.
+
+## Synopsis
+
+```bash
+mntpack exec <repo_or_package@version> [args...]
+```
+
+## Parameters
+
+<ParamField path="repo" type="string" required>
+  One of:
+  - `owner/repo` — a GitHub repository reference for an ephemeral run. The repository is fetched and built without creating a permanent install entry.
+  - `package@version` — an installed package name followed by `@` and a version tag or major version number that was previously synced with `-v`. Runs that version without switching the active version.
+</ParamField>
+
+<ParamField path="args" type="string[]">
+  Arguments forwarded to the executed binary or run command. To avoid flag-parsing conflicts, pass hyphen-prefixed arguments after a `--` separator.
+</ParamField>
+
+## Modes
+
+<Tabs>
+  <Tab title="Ephemeral repo run">
+    Pass any repository reference supported by `mntpack sync` — `owner/repo`, a shorthand that resolves against `defaultOwner`, or a full GitHub URL. mntpack fetches and builds the repository in a temporary execution context. No entry is written to `packages/` and no shim is created.
+
+    ```bash
+    mntpack exec MINTILER-DEV/php-asm compile test.php
+    ```
+
+    This is useful for trying a tool before committing to an install, or for CI steps that need a one-off build without polluting the package registry.
+  </Tab>
+  <Tab title="Specific installed version">
+    After installing a package at multiple versions with `mntpack sync -v`, you can run any of those versions by appending `@<version>` to the package name. The active version pointer (managed by `mntpack use`) is not changed.
+
+    ```bash
+    mntpack exec ripgrep@13 -- --version
+    mntpack exec ripgrep@14.1.0 -- pattern file.txt
+    ```
+
+    Versions are tracked at `~/.mntpack/store/versions/<repo>/<version-or-commit>/...`.
+  </Tab>
+</Tabs>
+
+<Note>
+  To permanently switch which version is active, use [`mntpack use`](/commands/use) instead. `exec` is intentionally non-destructive to the active version state.
+</Note>
+
+## Examples
+
+```bash
+# Ephemeral run — repo is not permanently installed
+mntpack exec MINTILER-DEV/php-asm compile test.php
+
+# Run a specific installed version without switching active version
+mntpack exec ripgrep@13 -- --version
+
+# Run another specific installed version
+mntpack exec ripgrep@14.1.0 -- pattern file.txt
+
+# Ephemeral run with no extra args
+mntpack exec owner/repo
+```
+
+<Tip>
+  If you find yourself running an ephemeral repo regularly, consider a permanent install with `mntpack sync owner/repo` so that subsequent runs benefit from caching and optional auto-update.
+</Tip>

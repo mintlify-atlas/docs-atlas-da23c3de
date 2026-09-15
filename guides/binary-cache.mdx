@@ -1,0 +1,152 @@
+---
+title: 'Sharing Pre-Built Binaries with the mntpack Binary Cache'
+sidebarTitle: 'Binary Cache'
+description: 'Configure a GitHub-hosted binary cache so team members and CI pipelines download pre-built artifacts instead of compiling from source every time.'
+---
+
+Building from source is reliable but slow — especially for large Rust or C++ projects. The mntpack binary cache solves this by letting you store pre-built, content-addressed binaries as release assets on a GitHub repository. When a matching binary is found at install time, mntpack downloads and extracts it instead of running the compiler, reducing a multi-minute build to a few seconds.
+
+## How the binary cache works
+
+Every installed binary in mntpack is keyed by a SHA-256 hash derived from the package source content. When `binaryCache.enabled` is `true`, the install pipeline checks a configured GitHub repository for a release tagged with that hash before falling back to other strategies.
+
+The full install resolution order is:
+
+<Steps>
+  <Step title="Local store">
+    Check `~/.mntpack/store/sha256/<hash>/` — if the binary is already present locally, use it immediately without any network call.
+  </Step>
+  <Step title="Binary cache repo">
+    Query `binaryCache.repo` on GitHub for a release whose tag matches the content hash. If a `.tar.xz` release asset is found, download and extract it.
+  </Step>
+  <Step title="Upstream release assets">
+    Fall back to the GitHub release assets of the original package repository (e.g. a pre-compiled binary published by the upstream project).
+  </Step>
+  <Step title="Local build">
+    Clone the repository and build from source using the appropriate language driver (Cargo, CMake, `dotnet build`, etc.).
+  </Step>
+</Steps>
+
+---
+
+## Enabling the binary cache
+
+Add the following to `~/.mntpack/config.json`:
+
+```json
+{
+  "binaryCache": {
+    "enabled": true,
+    "repo": "mntpack/mntpack-index"
+  }
+}
+```
+
+Or set the values with the CLI:
+
+```bash
+mntpack config set binaryCache.enabled true
+mntpack config set binaryCache.repo mntpack/mntpack-index
+```
+
+<Note>
+  `binaryCache.repo` defaults to the value of `syncDispatch.repo` when left unset. Both default to `"mntpack/mntpack-index"`, so enabling `binaryCache.enabled` alone is sufficient if you are using the standard mntpack index.
+</Note>
+
+---
+
+## Publishing binaries with `mntpack prebuild`
+
+`mntpack prebuild` is the command that populates the binary cache. Run it inside a repository that has already been synced by mntpack:
+
+```bash
+mntpack prebuild
+```
+
+What it does:
+
+1. Builds the package using the detected language driver
+2. Stores the resulting binary in the local content-addressed store under `~/.mntpack/store/sha256/<hash>/`
+3. Packages the binary as a `.tar.xz` archive
+4. Uploads the archive as a release asset to `binaryCache.repo`, tagged with the content hash
+
+<Warning>
+  `prebuild` requires `binaryCache.enabled: true` and a GitHub personal access token with `repo` write permission. The token must be available in the environment referenced by `syncDispatch.tokenEnv` (default: `MNTPACK_SYNC_DISPATCH_TOKEN`).
+</Warning>
+
+A typical CI job looks like:
+
+```yaml
+- name: Prebuild and cache binary
+  env:
+    MNTPACK_SYNC_DISPATCH_TOKEN: ${{ secrets.MNTPACK_TOKEN }}
+  run: mntpack prebuild
+```
+
+---
+
+## Sync dispatch integration
+
+After a successful `mntpack sync`, mntpack can automatically trigger a GitHub [`repository_dispatch`](https://docs.github.com/en/rest/repos/repos#create-a-repository-dispatch-event) event. This lets you chain a sync on a developer machine directly into a CI/CD pipeline that runs `mntpack prebuild` and populates the cache for everyone else.
+
+### Configuration
+
+```json
+{
+  "syncDispatch": {
+    "enabled": true,
+    "repo": "mntpack/mntpack-index",
+    "tokenEnv": "MNTPACK_SYNC_DISPATCH_TOKEN",
+    "eventType": "mntpack_sync"
+  }
+}
+```
+
+<Accordion title="syncDispatch config keys">
+  | Key | Type | Default | Description |
+  |---|---|---|---|
+  | `syncDispatch.enabled` | bool | `false` | Fire a `repository_dispatch` event after each successful sync |
+  | `syncDispatch.repo` | string | `"mntpack/mntpack-index"` | Target repository for the dispatch event |
+  | `syncDispatch.tokenEnv` | string | `"MNTPACK_SYNC_DISPATCH_TOKEN"` | Name of the environment variable that holds the GitHub token |
+  | `syncDispatch.eventType` | string | `"mntpack_sync"` | The `event_type` payload sent to the GitHub API |
+</Accordion>
+
+The token is read at runtime from the environment variable named by `syncDispatch.tokenEnv`. This keeps credentials out of `config.json` while still allowing per-machine or per-pipeline token configuration.
+
+Set it via CLI:
+
+```bash
+mntpack config set syncDispatch.enabled true
+mntpack config set syncDispatch.repo myorg/mntpack-cache
+mntpack config set syncDispatch.tokenEnv MY_GITHUB_TOKEN
+```
+
+### Recommended pipeline pattern
+
+<CardGroup cols={2}>
+  <Card title="Developer machine" icon="laptop">
+    Developer runs `mntpack sync owner/tool`. With `syncDispatch.enabled: true`, mntpack fires a `repository_dispatch` event to the index repo after the sync succeeds.
+  </Card>
+  <Card title="CI/CD pipeline" icon="server">
+    The dispatch event triggers a workflow that runs `mntpack prebuild`, archives the binary as `.tar.xz`, and uploads it to the binary cache repo. All subsequent installs skip the build step.
+  </Card>
+</CardGroup>
+
+---
+
+## Config reference
+
+The table below covers all binary cache and sync dispatch config keys. Use `mntpack config show` to inspect current values and `mntpack config set <key> <value>` to change them.
+
+| Key | Type | Default | Description |
+|---|---|---|---|
+| `binaryCache.enabled` | bool | `false` | Check and upload to the binary cache during install and prebuild |
+| `binaryCache.repo` | string | *(falls back to `syncDispatch.repo`)* | GitHub repository hosting pre-built release assets |
+| `syncDispatch.enabled` | bool | `false` | Fire a `repository_dispatch` after successful sync |
+| `syncDispatch.repo` | string | `"mntpack/mntpack-index"` | Dispatch target repository |
+| `syncDispatch.tokenEnv` | string | `"MNTPACK_SYNC_DISPATCH_TOKEN"` | Env var name containing the GitHub token |
+| `syncDispatch.eventType` | string | `"mntpack_sync"` | `event_type` value in the dispatch payload |
+
+<Tip>
+  Run `mntpack doctor` to verify that your binary cache configuration is valid and that the required environment variable is accessible. Pass `--fix` to attempt automatic repairs.
+</Tip>

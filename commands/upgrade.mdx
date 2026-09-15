@@ -1,0 +1,47 @@
+---
+title: "mntpack upgrade — Upgrade Packages via Release Assets"
+sidebarTitle: "upgrade"
+description: "Download the latest GitHub release assets for installed packages and update their store entries, without rebuilding from source."
+---
+
+The `upgrade` command updates installed packages by downloading the latest GitHub release assets — equivalent to running `mntpack sync <repo> -r auto` against each package. This is the release-asset upgrade path. If you want to pull the newest commits and rebuild from source instead, use [`mntpack update`](/commands/update).
+
+## Synopsis
+
+```bash
+mntpack upgrade [package]
+```
+
+## Arguments
+
+<ParamField path="package" type="string">
+  Name of a single installed package to upgrade. If omitted, mntpack upgrades **all** installed packages that have a release asset available.
+</ParamField>
+
+## Behavior
+
+For each package being upgraded, `upgrade` runs the `--release auto` flow:
+
+1. Queries the GitHub releases API for the latest release of the package's repository.
+2. Selects the best matching release asset for the current OS and architecture by looking for platform (`win`, `linux`, `macos`) and arch (`x64`, `arm64`, `x86`) strings in the asset filenames.
+3. Downloads the selected asset and extracts the binary.
+4. Stores the binary in `~/.mntpack/store/sha256/<hash>/`.
+5. Updates the installed package record to point to the new store entry.
+
+<Note>
+  `upgrade` relies on GitHub release assets being present. If a package was originally installed from source and has no release assets, `upgrade` may fall back to the source build path or report that no asset was found. Use `mntpack update` for source-only packages.
+</Note>
+
+<Tip>
+  Run `mntpack outdated` before upgrading to see which packages have newer releases available upstream.
+</Tip>
+
+## Examples
+
+```bash
+# Upgrade all installed packages via release assets
+mntpack upgrade
+
+# Upgrade a single package by name
+mntpack upgrade ripgrep
+```

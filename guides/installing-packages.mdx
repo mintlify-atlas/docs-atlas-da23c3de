@@ -1,0 +1,144 @@
+---
+title: "Installing GitHub Tools with mntpack sync"
+sidebarTitle: "Installing Packages"
+description: "Learn how mntpack sync clones, builds, and registers GitHub tools in a content-addressed store — with options for versions, release assets, and global shims."
+---
+
+`mntpack sync` is the primary command for installing developer tools from GitHub. It accepts a repository reference, resolves the source, builds the tool using the appropriate language driver, and registers the package in your local store. The aliases `add` and `install` are fully equivalent — all three map to the same internal command.
+
+## Repository Input Formats
+
+You can identify a repository in three ways: a bare repo name that resolves against your `defaultOwner` config value, an `owner/repo` slug, or a full GitHub URL.
+
+```bash
+mntpack sync ripgrep                                         # shorthand — uses defaultOwner from config
+mntpack sync BurntSushi/ripgrep                              # owner/repo
+mntpack sync https://github.com/BurntSushi/ripgrep.git       # full URL
+```
+
+<Tip>
+  Set `defaultOwner` once with `mntpack config set defaultOwner YourOrg` to avoid typing the owner prefix for every package you control.
+</Tip>
+
+## Installing from Pre-Built Release Assets
+
+By default, `mntpack sync` clones the repository and builds from source. Pass `-r`/`--release` to download a pre-built GitHub release asset instead, which is faster and skips any local toolchain requirement.
+
+```bash
+mntpack sync BurntSushi/ripgrep -r auto                      # auto-detect asset for current OS/arch
+mntpack sync owner/repo -r tool-linux-x64.tar.gz             # explicit asset filename
+```
+
+`-r auto` matches release asset filenames against your current platform and architecture using the following matrix:
+
+| OS      | Architecture | Target key    |
+|---------|-------------|---------------|
+| Windows | x86\_64     | `windows-x64` |
+| Windows | x86         | `windows-x86` |
+| Linux   | x86\_64     | `linux-x64`   |
+| Linux   | aarch64     | `linux-arm64` |
+| macOS   | x86\_64     | `macos-x64`   |
+| macOS   | aarch64     | `macos-arm64` |
+
+<Warning>
+  `-r`/`--release` cannot be combined with a commit hash passed to `-v`. If you provide both, the version value must be a tag, not a bare commit SHA.
+</Warning>
+
+## Installing a Specific Version, Tag, or Commit
+
+Use `-v`/`--version` to pin to a particular Git tag, semver version, or commit hash.
+
+```bash
+mntpack sync BurntSushi/ripgrep -v 14.1.0                    # tag
+mntpack sync BurntSushi/ripgrep -v 8f3c2a1                   # commit hash (cannot combine with -r)
+```
+
+## Custom Package Names
+
+By default the package is named after the repository. Override this with `--name` when you want a shorter alias or need to avoid a naming conflict.
+
+```bash
+mntpack sync owner/repo --name mytool
+```
+
+<Note>
+  If the requested name is already in use by a different installed package, mntpack will prompt you to choose an alternative at install time. Names are only considered occupied once a successful install record exists.
+</Note>
+
+## Creating a Global Shim
+
+Pass `-g`/`--global` to add a shim to `~/.mntpack/bin/` (or `$MNTPACK_HOME/bin/`) so the tool is immediately available on your `PATH`.
+
+```bash
+mntpack sync BurntSushi/ripgrep -g
+mntpack sync BurntSushi/ripgrep -v 14.1.0 -r auto -g         # release asset, specific version, global
+```
+
+<Note>
+  For Rust projects, the shim name is taken from the compiled executable name rather than the repository name. Shims route through `mntpack run <package>` when `autoUpdateOnRun` is enabled in your config.
+</Note>
+
+## What Happens During `sync`
+
+<Steps>
+  <Step title="Mirror the repository">
+    mntpack clones or updates a bare git mirror under `~/.mntpack/cache/git/`. Subsequent syncs of the same repo are fast incremental pulls.
+  </Step>
+  <Step title="Check out a linked worktree">
+    A linked git worktree is created (or updated) at `~/.mntpack/repos/<owner>/<repo>`. This gives you a clean working directory without duplicating the object store.
+  </Step>
+  <Step title="Detect project type and build">
+    mntpack inspects the worktree for known project files and selects the matching language driver. If `-r` was supplied, the release asset is downloaded instead of running a local build.
+
+    <AccordionGroup>
+      <Accordion title="Supported language drivers">
+        | Driver    | Detection signal                                              |
+        |-----------|---------------------------------------------------------------|
+        | Rust      | `Cargo.toml`                                                  |
+        | Python    | `requirements.txt` or `pyproject.toml`                       |
+        | Node.js   | `package.json`                                                |
+        | .NET / C# | `*.csproj`, `*.sln`, `*.slnx`, `Directory.Build.props`, `global.json` |
+        | C/C++     | `CMakeLists.txt` or `Makefile`                               |
+        | Generic   | `mntpack.json` with a `build` or `run` field                 |
+      </Accordion>
+    </AccordionGroup>
+  </Step>
+  <Step title="Store the binary">
+    The built (or downloaded) binary is placed in the content-addressed store at `~/.mntpack/store/sha256/<hash>/`. Identical binaries are deduplicated automatically.
+  </Step>
+  <Step title="Register the package record">
+    mntpack writes a package record under `~/.mntpack/packages/` linking the package name to the store entry, installed version, and source repository.
+  </Step>
+  <Step title="Create a global shim (if -g was passed)">
+    A shim script is written to `~/.mntpack/bin/<name>` that forwards invocations to the installed binary (or through `mntpack run` if `autoUpdateOnRun` is enabled).
+  </Step>
+</Steps>
+
+## Quick Reference
+
+<CardGroup cols={2}>
+  <Card title="Install from source" icon="code">
+    ```bash
+    mntpack sync BurntSushi/ripgrep
+    ```
+    Clones and builds from the default branch.
+  </Card>
+  <Card title="Install a release asset" icon="box">
+    ```bash
+    mntpack sync BurntSushi/ripgrep -r auto
+    ```
+    Downloads and extracts the matching platform binary.
+  </Card>
+  <Card title="Pin to a version" icon="tag">
+    ```bash
+    mntpack sync BurntSushi/ripgrep -v 14.1.0
+    ```
+    Checks out the given tag before building.
+  </Card>
+  <Card title="Add to PATH" icon="terminal">
+    ```bash
+    mntpack sync BurntSushi/ripgrep -g
+    ```
+    Creates a shim in `~/.mntpack/bin/`.
+  </Card>
+</CardGroup>

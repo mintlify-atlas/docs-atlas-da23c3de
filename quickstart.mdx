@@ -1,47 +1,188 @@
 ---
-title: "Quickstart"
-description: "Begin with a guide on the fastest path to a successful outcome"
+title: 'Get Started with mntpack in Minutes'
+sidebarTitle: 'Quickstart'
+description: 'Install a real tool from GitHub, create a global shim, check for updates, and explore release-asset installs — your first complete mntpack workflow.'
 ---
 
-Describe how someone begins using your product. What is the first thing they need to do? Are there any prerequisites?
+This quickstart walks you through the core mntpack workflow: syncing a tool directly from a GitHub repository, verifying the shim, checking what is installed, and keeping things up to date. By the end you will have a working global tool installed via mntpack and a solid mental model of how the system works.
 
-A quickstart should take someone from zero to using your product. They'll get a quick win and a sense of what they can accomplish.
+We'll use [ripgrep](https://github.com/BurntSushi/ripgrep) — a fast Rust-based search tool — as our example. The same commands work for any GitHub repository regardless of language.
 
-## Prerequisites
-
-Before you begin, you must have:
-
-- Requirement one (for example, Node.js 18+, a free account, an API key)
-- Requirement two (for example, a compatible device, a compatible browser, a compatible operating system)
-
-## Get started
+## Install and run your first tool
 
 <Steps>
-  <Step title="Install">
-    Describe how to install your product or sign up.
+  <Step title="Sync a tool with a global shim">
+    Use `mntpack sync` (or its aliases `add` / `install`) with the `-g` flag to install a tool and create a global shim in `~/.mntpack/bin/`:
 
     ```bash
-    npm install your-package
+    mntpack sync BurntSushi/ripgrep -g
     ```
+
+    mntpack will:
+    1. Clone `https://github.com/BurntSushi/ripgrep.git` into `~/.mntpack/repos/BurntSushi/ripgrep`
+    2. Detect the project type (`Cargo.toml` → Rust driver)
+    3. Build with `cargo build --release`
+    4. Store the binary in `~/.mntpack/store/sha256/<hash>/rg`
+    5. Create the global shim `~/.mntpack/bin/rg`
+
+    <Tip>
+      You can use three input formats interchangeably: `ripgrep` (repo name only, uses `defaultOwner`), `BurntSushi/ripgrep` (owner/repo), or the full URL `https://github.com/BurntSushi/ripgrep.git`.
+    </Tip>
   </Step>
-  <Step title="Configure">
-    Describe any setup or configuration needed before first use.
+
+  <Step title="Verify the shim">
+    Confirm the shim is on your PATH and the tool runs correctly:
 
     ```bash
-    your-cli init
+    rg --version
     ```
+
+    You should see output like `ripgrep 14.x.x`. If the command is not found, make sure `~/.mntpack/bin` is in your `PATH` (see [Installation](/installation)).
   </Step>
-  <Step title="Run it">
-    Show the first thing a user does to see it working.
+
+  <Step title="Check what is installed">
+    List all installed packages. Add `-g` to show only packages with global shims:
 
     ```bash
-    your-cli start
+    mntpack list
+    ```
+
+    ```bash
+    mntpack list --global
+    ```
+
+    Each entry shows the package name, the source repository, and the installed version or commit.
+  </Step>
+
+  <Step title="Check for available updates">
+    Compare your installed packages against the latest upstream commits:
+
+    ```bash
+    mntpack outdated
+    ```
+
+    Packages with newer commits available will be listed with their current and upstream SHAs.
+  </Step>
+
+  <Step title="Update all packages">
+    Pull and rebuild all outdated packages at once:
+
+    ```bash
+    mntpack update
+    ```
+
+    To update a single package by name:
+
+    ```bash
+    mntpack update ripgrep
     ```
   </Step>
 </Steps>
 
-<Tip>
-  Give people a way to get help. This could be a link to a support page, a chat with a customer support agent, or a forum for your product.
+## Install from a release asset
 
-  Example: Need help? Reach out to us at [support@yourcompany.com](mailto:support@yourcompany.com).
-</Tip>
+Building from source gives you the latest commit, but for stable, fast installs you can download a pre-built release asset directly from GitHub Releases. Use `-r auto` to let mntpack pick the right asset for your current OS and architecture automatically:
+
+```bash
+mntpack sync BurntSushi/ripgrep -r auto -g
+```
+
+<Info>
+  `-r auto` performs platform and architecture matching against the available release assets. For most well-maintained projects it will find the correct binary without any manual specification. You can also provide an exact asset filename: `mntpack sync owner/repo -r tool-linux-x64.tar.gz -g`.
+</Info>
+
+To upgrade installed packages to their latest release assets (bypassing the source-build flow):
+
+```bash
+mntpack upgrade
+```
+
+## Pin a specific version
+
+Install a specific tagged release using `-v`:
+
+```bash
+mntpack sync BurntSushi/ripgrep -v 14.1.0 -g
+```
+
+You can also pin to a commit hash:
+
+```bash
+mntpack sync BurntSushi/ripgrep -v 8f3c2a1 -g
+```
+
+<Note>
+  When you use `-r` (release asset download) together with `-v`, the version must be a tag — commit hashes are not valid release asset identifiers and will be rejected.
+</Note>
+
+## Install multiple versions and switch between them
+
+mntpack can maintain multiple installed versions of the same package side-by-side:
+
+```bash
+mntpack sync BurntSushi/ripgrep -v 13.0.0
+mntpack sync BurntSushi/ripgrep -v 14.1.0
+```
+
+Switch the active version (updates the global shim target):
+
+```bash
+mntpack use ripgrep 14.1.0
+```
+
+Run a specific version once without switching:
+
+```bash
+mntpack exec ripgrep@13.0.0 -- --version
+```
+
+## Inspect a package
+
+Get details about an installed package (version, shim location, store path):
+
+```bash
+mntpack info ripgrep
+```
+
+Find which package owns a particular command name:
+
+```bash
+mntpack which rg
+```
+
+## Remove a package
+
+Uninstall a package and remove its global shim:
+
+```bash
+mntpack remove ripgrep
+```
+
+All of `remove`, `uninstall`, `rm`, and `unsync` are aliases for the same operation. You can pass a package name (`ripgrep`) or a repo form (`BurntSushi/ripgrep`).
+
+## Run without installing globally
+
+To run a tool ephemerally — without creating a global shim or registering it as an installed package — use `exec`:
+
+```bash
+mntpack exec BurntSushi/ripgrep -- --version
+```
+
+This clones, builds (or reuses a cached build), and runs the tool in one step.
+
+## Explore further
+
+<CardGroup cols={2}>
+  <Card title="Installing Packages" icon="download" href="/guides/installing-packages">
+    Deep dive into sync options: naming, release assets, version pinning, and conflict resolution.
+  </Card>
+  <Card title="Version Management" icon="arrows-rotate" href="/guides/version-management">
+    Install multiple versions, switch active versions, and run specific versions ephemerally.
+  </Card>
+  <Card title="mntpack.json Manifest" icon="file-code" href="/guides/manifest">
+    Customise build steps, run commands, release asset mappings, and NuGet declarations for your own packages.
+  </Card>
+  <Card title="sync command" icon="terminal" href="/commands/sync">
+    Full reference for all flags accepted by `mntpack sync` / `add` / `install`.
+  </Card>
+</CardGroup>

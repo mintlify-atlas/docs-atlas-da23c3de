@@ -1,0 +1,59 @@
+---
+title: "mntpack list — Show All Installed Packages"
+sidebarTitle: "list"
+description: "List every package tracked by mntpack, or narrow the output to only global shim mappings with --global. Useful for auditing what is installed."
+---
+
+The `list` command gives you a quick overview of your mntpack installation. Without any flags it prints every package that has been synced into `~/.mntpack/packages/`, along with key metadata such as the source repository and installed version. Passing `--global` narrows the output to the global shim layer only, showing each shim name and the package it maps to — useful when you want to confirm that a particular command is wired up correctly or to audit what is on your PATH via `~/.mntpack/bin/`.
+
+## Synopsis
+
+```bash
+mntpack list [-g]
+```
+
+## Parameters
+
+<ParamField path="-g, --global" type="boolean">
+  When set, shows only global shim mappings in the format `shim → package`. Omit this flag to see all installed packages with their full metadata.
+</ParamField>
+
+## Output Modes
+
+<Tabs>
+  <Tab title="All packages (default)">
+    Lists every installed package tracked in `~/.mntpack/packages/`. Each entry typically shows:
+    - Package name
+    - Source repository
+    - Installed version or commit
+
+    ```bash
+    mntpack list
+    ```
+  </Tab>
+  <Tab title="Global shims only (--global)">
+    Shows only the shim entries that were created with `-g/--global` during `mntpack sync`. Each line is a `shim → package` mapping, reflecting what lives in `~/.mntpack/bin/`.
+
+    ```bash
+    mntpack list --global
+    ```
+  </Tab>
+</Tabs>
+
+<Note>
+  A package can be installed (appear in `mntpack list`) without having a global shim (appear in `mntpack list --global`). Global shims are only created when `-g` is passed to `mntpack sync` or `mntpack reinstall`.
+</Note>
+
+## Examples
+
+```bash
+# List all installed packages
+mntpack list
+
+# List only global shim mappings
+mntpack list --global
+```
+
+<Tip>
+  To check whether your installed packages have newer upstream versions available, run [`mntpack outdated`](/commands/outdated) after reviewing the list.
+</Tip>

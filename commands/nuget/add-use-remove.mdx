@@ -1,0 +1,275 @@
+---
+title: "mntpack nuget add, use, and remove Package References"
+sidebarTitle: "add / use / remove"
+description: "Add, replace, or drop NuGet package references in a C# project — with use as the all-in-one path that builds, configures NuGet.config, and restores automatically."
+---
+
+These commands manage NuGet package references inside a C# project. `add` wraps `dotnet add package` with optional restore and build steps. `use` is the preferred high-level command for local-source packages — it ensures the feed is ready, writes `NuGet.config`, adds the reference, and restores in one pass. `remove` wraps `dotnet remove package`. `list`, `apply`, and `restore` operate on declarations stored in `mntpack.json`, letting teams commit their NuGet requirements alongside the rest of the mntpack manifest.
+
+---
+
+## mntpack nuget add
+
+Adds a NuGet package reference to the target project by running `dotnet add package`, then optionally restoring and building.
+
+### Synopsis
+
+```
+mntpack nuget add <package> [version]
+    [--source <source>]
+    [--path <dir>]
+    [--project <file>]
+    [--no-restore]
+    [--refresh]
+    [--build]
+```
+
+### Parameters
+
+<ParamField path="package" type="string" required>
+  NuGet package ID to add (e.g. `Newtonsoft.Json`).
+</ParamField>
+
+<ParamField path="version" type="string">
+  Package version to pin. If omitted, `dotnet` resolves the latest compatible version.
+</ParamField>
+
+<ParamField path="--source" type="string">
+  NuGet source to resolve the package from. Use `mntpack-local` to pull from the mntpack-managed feed.
+</ParamField>
+
+<ParamField path="--path" type="directory path">
+  Working directory containing the target project. Defaults to the current directory.
+</ParamField>
+
+<ParamField path="--project" type="file path">
+  Explicit path to a `.csproj` or `.sln` file. Takes precedence over `--path`.
+</ParamField>
+
+<ParamField path="--no-restore" type="boolean">
+  Skip the automatic `dotnet restore` after adding the reference.
+</ParamField>
+
+<ParamField path="--refresh" type="boolean">
+  Clear the global NuGet cache entry for the package before restoring. Useful when a package has been rebuilt locally with the same version number.
+</ParamField>
+
+<ParamField path="--build" type="boolean">
+  Run `dotnet build` after restore completes.
+</ParamField>
+
+---
+
+## mntpack nuget use
+
+The all-in-one command for consuming local-source packages. `use` performs every step needed to get a package into your project from a cold start.
+
+### Synopsis
+
+```
+mntpack nuget use <package> [version]
+    [--source <source>]
+    [--path <dir>]
+    [--project <file>]
+    [--no-restore]
+    [--refresh]
+    [--build]
+```
+
+### What it does
+
+<Steps>
+  <Step title="Check the local feed">
+    Verifies whether the requested package version already exists in `~/.mntpack/nuget/feed/`.
+  </Step>
+  <Step title="Build missing source package (if registered)">
+    If the package is absent and a matching `nugetSources` entry exists in `mntpack.json`, mntpack runs `source build` to clone, pack, and publish it automatically.
+  </Step>
+  <Step title="Update mntpack.json">
+    Records the package reference in the `nuget.packages` list of `mntpack.json` for the project.
+  </Step>
+  <Step title="Write NuGet.config">
+    Calls `nuget init` to ensure `NuGet.config` contains the `mntpack-local` source.
+  </Step>
+  <Step title="Add reference and restore">
+    Runs `dotnet add package` and then `dotnet restore` on the target project.
+  </Step>
+</Steps>
+
+<Tip>
+  Prefer `use` over a manual `source build` + `init` + `add` sequence whenever working with packages registered via `mntpack nuget source add`.
+</Tip>
+
+The flags accepted by `use` are identical to those for `add` — see the parameter table above.
+
+---
+
+## mntpack nuget remove
+
+Removes a NuGet package reference from the target project by calling `dotnet remove package`.
+
+### Synopsis
+
+```
+mntpack nuget remove <package>
+    [--path <dir>]
+    [--project <file>]
+    [--no-restore]
+    [--build]
+```
+
+### Parameters
+
+<ParamField path="package" type="string" required>
+  NuGet package ID to remove.
+</ParamField>
+
+<ParamField path="--path" type="directory path">
+  Working directory containing the target project.
+</ParamField>
+
+<ParamField path="--project" type="file path">
+  Explicit path to a `.csproj` or `.sln` file.
+</ParamField>
+
+<ParamField path="--no-restore" type="boolean">
+  Skip `dotnet restore` after removing the reference.
+</ParamField>
+
+<ParamField path="--build" type="boolean">
+  Run `dotnet build` after restore.
+</ParamField>
+
+---
+
+## mntpack nuget list
+
+Lists the NuGet package references declared in `mntpack.json` for the project — not the packages resolved by `dotnet`, but the entries mntpack itself tracks.
+
+### Synopsis
+
+```
+mntpack nuget list [--path <dir>] [--project <file>]
+```
+
+---
+
+## mntpack nuget apply
+
+Reads every entry in the `nuget.packages` list of `mntpack.json` and calls `dotnet add package` for each one, then optionally restores and builds. Use `apply` to re-hydrate a project after cloning a repository that ships a committed `mntpack.json`.
+
+`apply` has the alias `install`, so `mntpack nuget install` is equivalent.
+
+### Synopsis
+
+```
+mntpack nuget apply
+    [--path <dir>]
+    [--project <file>]
+    [--refresh]
+    [--build]
+```
+
+---
+
+## mntpack nuget restore
+
+Runs `dotnet restore` on the target project. Accepts the same `--path`, `--project`, `--refresh`, and `--build` flags as `apply`.
+
+### Synopsis
+
+```
+mntpack nuget restore
+    [--path <dir>]
+    [--project <file>]
+    [--refresh]
+    [--build]
+```
+
+---
+
+## mntpack nuget refresh
+
+One-shot pipeline: updates all registered source repos, rebuilds their packages into the local feed, clears stale global NuGet cache entries, and restores the consumer project.
+
+### Synopsis
+
+```
+mntpack nuget refresh
+    [--path <dir>]
+    [--project <file>]
+    [--force]
+    [--build]
+```
+
+<ParamField path="--force" type="boolean">
+  Force a rebuild of all source packages even if the feed already contains the current version.
+</ParamField>
+
+<ParamField path="--build" type="boolean">
+  Run `dotnet build` on the consumer project after restore completes.
+</ParamField>
+
+---
+
+## mntpack nuget cache clear {#nuget-cache-clear}
+
+Removes an entry from the global NuGet package cache (`~/.nuget/packages/` on Linux and macOS, `%USERPROFILE%\.nuget\packages\` on Windows). This is necessary when a package has been rebuilt locally and published to the feed with the same version string — the old cached copy would otherwise shadow the updated `.nupkg`.
+
+### Synopsis
+
+```
+mntpack nuget cache clear <package> [version]
+```
+
+<ParamField path="package" type="string" required>
+  NuGet package ID whose cache entry should be removed.
+</ParamField>
+
+<ParamField path="version" type="string">
+  Specific version to clear. If omitted, all cached versions of the package are removed.
+</ParamField>
+
+---
+
+## Examples
+
+<CodeGroup>
+
+```bash use (recommended for local packages)
+# All-in-one: build feed entry if needed, write NuGet.config, add reference, restore
+mntpack nuget use CS2Luau.Roblox 1.0.0-local.1
+```
+
+```bash add (public or explicit source)
+# Add a public package
+mntpack nuget add Newtonsoft.Json 13.0.3
+
+# Add from the local feed and build afterward
+mntpack nuget add MyLib 1.0.0 --source mntpack-local --build
+```
+
+```bash remove
+mntpack nuget remove Newtonsoft.Json
+```
+
+```bash list / apply / restore
+# Show packages tracked in mntpack.json
+mntpack nuget list
+
+# Apply all mntpack.json nuget entries to a project
+mntpack nuget apply --project src/MyProject/MyProject.csproj
+
+# Restore the project
+mntpack nuget restore
+```
+
+```bash cache & refresh
+# Clear a stale cache entry
+mntpack nuget cache clear CS2Luau.Roblox 1.0.0-local.1
+
+# Force-rebuild all sources, clear cache, restore, and build
+mntpack nuget refresh --force --build
+```
+
+</CodeGroup>

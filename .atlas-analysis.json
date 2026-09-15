@@ -1,23 +1,11 @@
 {
-  "$schema": "https://mintlify.com/docs.json",
-  "name": "mntpack",
+  "projectType": "cli-tool",
+  "projectName": "mntpack",
+  "projectDescription": "A GitHub-aware package manager, version manager, and runtime launcher for developer tools — written in Rust.",
   "theme": "aspen",
-  "colors": {
-    "primary": "#3B82F6",
-    "light": "#EFF6FF",
-    "dark": "#1E3A5F"
-  },
-  "navbar": {
-    "primary": {
-      "type": "github",
-      "href": "https://github.com/mntpack/mntpack"
-    }
-  },
-  "footer": {
-    "socials": {
-      "github": "https://github.com/mntpack/mntpack"
-    }
-  },
+  "primaryColor": "#3B82F6",
+  "lightColor": "#EFF6FF",
+  "darkColor": "#1E3A5F",
   "navigation": {
     "tabs": [
       {
@@ -110,5 +98,42 @@
         ]
       }
     ]
-  }
+  },
+  "keyFeatures": [
+    "Sync packages from GitHub using shorthand, owner/repo, or full URL",
+    "Driver-based installation for Rust, Python, Node.js, .NET/C#, C/C++, and generic packages",
+    "Content-addressed binary store with SHA-256 hashing",
+    "Global shim generation with optional auto-update on run",
+    "Version switching and ephemeral exec for specific package versions",
+    "Remote binary cache support via GitHub releases",
+    "Managed local NuGet feed with source-backed C# package workflows",
+    "GitHub release asset auto-detection for pre-built binaries",
+    "Lazy build — packages are prepared on-demand when artifacts are missing",
+    "mntpack.json manifest for custom build, run, and release configuration"
+  ],
+  "publicApiSurface": [
+    "mntpack sync <repo> [-v <version>] [-r <asset|auto>] [-n <name>] [-g]",
+    "mntpack remove <repo_or_package>",
+    "mntpack reinstall <package>",
+    "mntpack update [package]",
+    "mntpack upgrade [package]",
+    "mntpack use <package> <version>",
+    "mntpack run <package> [args...]",
+    "mntpack exec <repo_or_package@version> [args...]",
+    "mntpack info <package>",
+    "mntpack list [--global]",
+    "mntpack which <command>",
+    "mntpack outdated",
+    "mntpack inspect <repo>",
+    "mntpack search <query...>",
+    "mntpack why <package>",
+    "mntpack clean [--repos]",
+    "mntpack prebuild",
+    "mntpack doctor [--fix]",
+    "mntpack config show|get|set|reset",
+    "mntpack nuget init|add|use|remove|list|apply|restore|refresh",
+    "mntpack nuget source add|list|build|build-all|update|sync",
+    "mntpack nuget feed path|list",
+    "mntpack nuget cache clear <package> [version]"
+  ]
 }

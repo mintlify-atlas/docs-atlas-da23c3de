@@ -1,0 +1,95 @@
+---
+title: "mntpack nuget feed — Inspect the Local NuGet Feed"
+sidebarTitle: "nuget feed"
+description: "Inspect the mntpack-managed local NuGet feed: print its absolute path or list every .nupkg currently published there for use by dotnet and other NuGet clients."
+---
+
+The `mntpack nuget feed` subcommands let you introspect the local NuGet feed that mntpack maintains at `~/.mntpack/nuget/feed/`. The feed directory is the single source of truth for all source-backed packages built by `mntpack nuget source build`. Any NuGet client — `dotnet`, the NuGet CLI, Visual Studio, or Rider — can consume packages from this directory by pointing a NuGet source at the path returned by `mntpack nuget feed path`. mntpack itself configures this automatically via `NuGet.config` when you run `mntpack nuget init` or `mntpack nuget use`.
+
+---
+
+## mntpack nuget feed path
+
+Prints the absolute filesystem path to the managed local NuGet feed directory. The output can be used directly as a `--source` value in `dotnet add package` or as the `value` attribute of a `<add>` entry in any `NuGet.config`.
+
+### Synopsis
+
+```
+mntpack nuget feed path
+```
+
+### Example output
+
+```
+/home/alice/.mntpack/nuget/feed/
+```
+
+### Using the path in other tools
+
+<Tabs>
+  <Tab title="dotnet CLI">
+    Pass the feed path as an explicit source when restoring or adding a package:
+
+    ```bash
+    dotnet add package CS2Luau.Roblox \
+      --version 1.0.0-local.1 \
+      --source "$(mntpack nuget feed path)"
+    ```
+  </Tab>
+  <Tab title="NuGet.config (manual)">
+    Add the feed as a `packageSource` entry in any `NuGet.config`:
+
+    ```xml
+    <configuration>
+      <packageSources>
+        <add key="mntpack-local"
+             value="/home/alice/.mntpack/nuget/feed/" />
+      </packageSources>
+    </configuration>
+    ```
+
+    This is exactly what `mntpack nuget init` writes for you automatically.
+  </Tab>
+  <Tab title="Visual Studio / Rider">
+    In **Tools → NuGet → Package Sources** (Visual Studio) or **Settings → NuGet** (Rider), add a new source with the path printed by `mntpack nuget feed path` as the URL.
+  </Tab>
+</Tabs>
+
+<Note>
+  The feed path is machine-specific because it expands the user's home directory. Do not hard-code it in committed `NuGet.config` files intended for cross-machine use — use `mntpack nuget init` to generate the correct path for each machine, and add `NuGet.config` to `.gitignore`.
+</Note>
+
+---
+
+## mntpack nuget feed list
+
+Lists all `.nupkg` files currently published in the local feed. Use this to confirm that a `source build` succeeded or to audit which package versions are available before running `dotnet restore`.
+
+### Synopsis
+
+```
+mntpack nuget feed list
+```
+
+### Example output
+
+```
+CS2Luau.Roblox.1.0.0-local.1.nupkg
+Newtonsoft.Json.13.0.3.nupkg
+```
+
+---
+
+## Examples
+
+```bash
+# Print the feed directory path
+mntpack nuget feed path
+
+# List all packages currently in the feed
+mntpack nuget feed list
+```
+
+<Tip>
+  After running `mntpack nuget source build`, use `mntpack nuget feed list` to confirm the `.nupkg` is present before running `mntpack nuget use` or `dotnet restore`.
+</Tip>

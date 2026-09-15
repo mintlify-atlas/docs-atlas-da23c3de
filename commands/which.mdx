@@ -1,0 +1,41 @@
+---
+title: "mntpack which — Find Which Package Owns a Command"
+sidebarTitle: "which"
+description: "Resolve a shim or command name back to the mntpack package that provides it. Useful when multiple tools share similar binary names."
+---
+
+The `which` command answers the question "where does this command come from?" by looking up a shim name in `~/.mntpack/bin/` and reporting the package that owns it. This is especially handy when you have multiple installed tools that expose similarly named binaries, when you're debugging PATH issues, or when you want to confirm that a command you're about to run is actually being served by a particular mntpack-managed package rather than a system binary.
+
+## Synopsis
+
+```bash
+mntpack which <command>
+```
+
+## Parameters
+
+<ParamField path="command" type="string" required>
+  The name of the shim or command to look up. This is the bare command name as it appears in `~/.mntpack/bin/` — for example, `rg` for ripgrep or `phc` for a PHP-based compiler. Do not include path separators.
+</ParamField>
+
+## Output
+
+`mntpack which` prints the package name that provides the given command. If no mntpack-managed package owns the command, the tool exits with a non-zero status.
+
+<Note>
+  This command only inspects the mntpack shim layer at `~/.mntpack/bin/`. It does not search your full `PATH`. To find the resolved binary on your system `PATH`, use the shell built-in `which` or `command -v` alongside `mntpack which` for complete coverage.
+</Note>
+
+## Examples
+
+```bash
+# Find which package provides the 'phc' command
+mntpack which phc
+
+# Find which package provides the 'rg' command
+mntpack which rg
+```
+
+<Tip>
+  Once you know the package name from `mntpack which`, you can get full installation details — repo, version, binary hash, and store path — with [`mntpack info <package>`](/commands/info).
+</Tip>

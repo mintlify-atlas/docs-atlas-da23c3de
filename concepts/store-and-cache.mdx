@@ -1,0 +1,153 @@
+---
+title: "Content-Addressed Store and Git Cache Internals"
+sidebarTitle: "Store & Cache"
+description: "Understand how mntpack deduplicates binaries with SHA-256 hashing, manages git mirror caches, and supports lazy builds and remote binary fetching."
+---
+
+mntpack never stores two copies of the same binary. Every artifact it produces is hashed on write and addressed by that hash, so reinstalling the same tool at the same commit reuses the stored file without touching disk twice. Separately, git repositories are kept as bare mirrors and checked out as linked worktrees — meaning a single clone serves all versions of a package. This page explains each layer of the storage system.
+
+## Directory Layout
+
+All storage lives under `~/.mntpack/` (or the path set in `MNTPACK_HOME`):
+
+```text
+~/.mntpack/
+  config.json
+  repos/
+    <owner>/
+      <repo>/          ← linked git worktree
+  packages/
+    <name>/            ← package record + binary copy
+  store/
+    sha256/
+      <hash>/          ← content-addressed binary store
+        <binary>
+    versions/
+      <owner>/
+        <repo>/
+          <version-or-commit>/   ← version alias entries
+  cache/
+    git/
+      *.git            ← bare git mirror clones
+    exec/              ← ephemeral exec installs
+    binary-cache/      ← downloaded remote pre-built binaries
+  nuget/
+    feed/
+    state/
+  bin/                 ← global shims
+```
+
+## Content-Addressed Binary Store
+
+When mntpack builds a package, it computes a SHA-256 hash of the resulting binary and writes it to:
+
+```text
+~/.mntpack/store/sha256/<hash>/<binary>
+```
+
+The package record in `~/.mntpack/packages/<name>/` then references this hash. If you reinstall a package that produces the exact same binary as a prior install, mntpack reuses the existing store entry — no duplicate bytes on disk.
+
+This design also enables **integrity verification**: at run time, mntpack can confirm the binary in the store still matches the recorded hash before executing it.
+
+## Version Aliases
+
+When you pin a package to a specific version or commit with `mntpack use` or `mntpack exec <package>@<version>`, mntpack tracks a version alias at:
+
+```text
+~/.mntpack/store/versions/<owner>/<repo>/<version-or-commit>/
+```
+
+This lets multiple installed versions of the same package coexist without overwriting each other. The alias points back into `store/sha256/` so the binary itself is still deduplicated.
+
+```bash
+# Install two versions of the same tool
+mntpack install ripgrep -v 13
+mntpack install ripgrep -v 14
+
+# Switch the active version
+mntpack use ripgrep 14
+
+# Run a specific version without switching
+mntpack exec ripgrep@13 -- --version
+```
+
+## Git Mirror Cache
+
+Rather than cloning a repository directly into a working directory, mntpack first creates a **bare mirror** clone inside `~/.mntpack/cache/git/`. Bare mirrors contain the full object database but no working tree, making them compact and fast to fetch into.
+
+```text
+~/.mntpack/cache/git/
+  owner__repo.git      ← bare mirror
+```
+
+Working directories under `~/.mntpack/repos/<owner>/<repo>` are **linked worktrees** backed by these mirrors. A linked worktree shares the object store of the bare mirror, so switching branches or commits is a metadata operation rather than a full re-clone.
+
+<Tip>
+Run `mntpack clean --repos` to remove repo clones that are no longer referenced by any installed package. The bare mirrors in `cache/git/` are left intact and will be reused on the next sync.
+</Tip>
+
+## Lazy Build
+
+`sync` (and its aliases) is **clone-first**: it updates the repository to the requested version but does not necessarily produce build artifacts immediately. The package is marked for preparation, and build artifacts are created **on-demand** when you first call:
+
+```bash
+mntpack run <package>
+```
+
+This keeps initial sync fast and defers compilation until the tool is actually needed. If `autoUpdateOnRun` is enabled in config, `run` also pulls the latest commits before building.
+
+## Exec Cache
+
+The `exec` command runs a repository as an ephemeral tool without registering a persistent package. Its build artifacts are kept separately at:
+
+```text
+~/.mntpack/cache/exec/
+```
+
+Ephemeral installs are cleaned up with `mntpack clean` (without `--repos`).
+
+```bash
+# Run a tool ephemerally — no persistent package record created
+mntpack exec MINTILER-DEV/php-asm compile test.php
+```
+
+## Remote Binary Cache
+
+For teams or CI pipelines that want to skip local compilation entirely, mntpack supports a **remote binary cache**. When enabled, `sync` attempts to fetch a pre-built binary from a configured GitHub repository before falling back to a local build:
+
+```json
+{
+  "binaryCache": {
+    "enabled": true,
+    "repo": "mntpack/mntpack-index"
+  }
+}
+```
+
+Downloaded binaries land in `~/.mntpack/cache/binary-cache/` and are validated against the content-addressed store before use. Release assets in `.tar.xz` format are also recognized.
+
+Use `mntpack prebuild` inside a repository to build and upload a hashed binary to the configured cache repository.
+
+<CodeGroup>
+```bash Enable binary cache
+mntpack config set binaryCache.enabled true
+mntpack config set binaryCache.repo mntpack/mntpack-index
+```
+
+```bash Upload a binary to the cache
+mntpack prebuild
+```
+</CodeGroup>
+
+## Cleaning Up
+
+<CardGroup cols={2}>
+  <Card title="Clean exec cache" icon="trash">
+    `mntpack clean` — removes ephemeral exec artifacts and orphaned cache entries
+  </Card>
+  <Card title="Clean unused repos" icon="folder-minus">
+    `mntpack clean --repos` — also removes worktree checkouts no longer linked to any package
+  </Card>
+</CardGroup>
+
+Neither command deletes the SHA-256 store or bare git mirrors. Store entries are retained for potential reuse across reinstalls.

@@ -1,0 +1,103 @@
+---
+title: 'mntpack: GitHub-Aware Package Manager for Developers'
+sidebarTitle: 'Introduction'
+description: 'mntpack installs developer tools directly from GitHub repositories — building from source or grabbing release assets — with global shims, version switching, and a content-addressed store.'
+---
+
+mntpack (Mintiler Package Manager) is a GitHub-aware package manager, version manager, and runtime launcher written in Rust. Unlike traditional package managers that only work with tools listed in a curated registry, mntpack lets you install **any GitHub repository** as a developer tool — cloning source code, detecting the language automatically, building with the right driver, and creating a global shim in `~/.mntpack/bin/`. You get the full power of `apt`, `brew`, and `cargo install` in one tool, without needing the author to publish to any registry.
+
+## Why mntpack?
+
+<CardGroup cols={2}>
+  <Card title="Any GitHub Repo" icon="github">
+    Install tools from any public repository using `owner/repo` shorthand, a full GitHub URL, or just the repo name when `defaultOwner` is set.
+  </Card>
+  <Card title="Language-Aware Drivers" icon="wrench">
+    Automatically detects and builds Rust, Python, Node.js, .NET/C#, C/C++, and generic `mntpack.json` projects — no manual configuration needed.
+  </Card>
+  <Card title="Content-Addressed Store" icon="database">
+    Binaries are deduplicated in a SHA-256 content-addressed store at `~/.mntpack/store/sha256/<hash>/`. Multiple versions share storage automatically.
+  </Card>
+  <Card title="Version Switching" icon="arrows-rotate">
+    Install multiple versions of the same tool side-by-side and switch the active one with `mntpack use <package> <version>`, or run a specific version ephemerally with `mntpack exec <package>@<version>`.
+  </Card>
+</CardGroup>
+
+## How mntpack differs from traditional package managers
+
+| Feature | apt / brew | cargo install | mntpack |
+|---|---|---|---|
+| Source | Curated registry | crates.io | Any GitHub repo |
+| Languages | Package-specific | Rust only | Rust, Python, Node, .NET, C/C++, Generic |
+| Version pinning | Limited | Limited | Full (`-v tag_or_commit`) |
+| Release assets | No | No | Yes (`-r auto`) |
+| Global shims | Yes | Yes | Yes (`-g`) |
+| Binary cache | No | No | Yes (`binaryCache` config) |
+
+## Installation layout
+
+mntpack organises everything under a single root directory, defaulting to `~/.mntpack/`:
+
+```text
+~/.mntpack/
+  config.json          # all configuration
+  repos/               # mirror-backed git worktrees (repos/<owner>/<repo>)
+  packages/            # installed package records
+  store/               # content-addressed binary store
+    sha256/            # store/sha256/<hash>/<binary>
+    versions/          # version alias index for `use` / `exec @version`
+  cache/
+    git/               # git mirror cache backing repo worktrees
+    exec/              # ephemeral exec cache
+    binary-cache/      # remote binary cache downloads
+  nuget/
+    feed/              # managed local NuGet feed
+    state/             # source-backed NuGet package state
+  bin/                 # global shims — add this to PATH
+```
+
+<Note>
+  Set the `MNTPACK_HOME` environment variable to use a custom root directory instead of `~/.mntpack`. Every path above resolves relative to that root.
+</Note>
+
+## Language drivers
+
+mntpack detects your project type from the files present in the repository and picks the right build driver automatically:
+
+<CardGroup cols={3}>
+  <Card title="Rust" icon="gear">
+    Detected by `Cargo.toml`. Builds with `cargo build --release`.
+  </Card>
+  <Card title="Python" icon="python">
+    Detected by `requirements.txt` or `pyproject.toml`. Installs with `pip`.
+  </Card>
+  <Card title="Node.js" icon="node-js">
+    Detected by `package.json`. Builds with `npm`.
+  </Card>
+  <Card title=".NET / C#" icon="microsoft">
+    Detected by `*.csproj`, `*.sln`, `*.slnx`, `Directory.Build.props`, or `global.json`. Builds with `dotnet build`.
+  </Card>
+  <Card title="C / C++" icon="c">
+    Detected by `CMakeLists.txt` or `Makefile`. Builds with `cmake` or `make`.
+  </Card>
+  <Card title="Generic" icon="file-code">
+    Falls back to `mntpack.json` with a `build` and `run` command for anything else.
+  </Card>
+</CardGroup>
+
+## Explore the docs
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Build mntpack from source and run the installer to set up your environment.
+  </Card>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Install your first tool from GitHub, create a global shim, and learn the core workflow in minutes.
+  </Card>
+  <Card title="Language Drivers" icon="wrench" href="/concepts/drivers">
+    How mntpack detects project types and which build tool each driver invokes.
+  </Card>
+  <Card title="mntpack.json Manifest" icon="file-code" href="/guides/manifest">
+    Customise build commands, run targets, release asset mappings, and NuGet declarations.
+  </Card>
+</CardGroup>

@@ -1,0 +1,149 @@
+---
+title: "How mntpack Manages Packages from GitHub"
+sidebarTitle: "Packages"
+description: "Learn how mntpack models GitHub repositories as managed packages, how naming resolves, and what install records track under the hood."
+---
+
+Every tool managed by mntpack maps one-to-one to a GitHub repository. When you run `mntpack sync`, mntpack clones the repository, selects the appropriate language driver to build it, copies the resulting binary into a content-addressed store, and writes a package record so it can be updated, versioned, and removed later. Understanding this model makes the rest of mntpack's behavior predictable.
+
+## Repository Input Formats
+
+The `sync` command (and its aliases `add` and `install`) accepts three input styles for identifying a GitHub repository:
+
+<CodeGroup>
+```bash Short name (uses defaultOwner)
+mntpack sync scalf
+```
+
+```bash Owner/repo
+mntpack sync MINTILER-DEV/scalf
+```
+
+```bash Full GitHub URL
+mntpack sync https://github.com/user/repo.git
+```
+</CodeGroup>
+
+When you provide only a bare repository name (e.g. `scalf`), mntpack prepends the `defaultOwner` config value — which defaults to `"mntpack"`. You can change it with:
+
+```bash
+mntpack config set defaultOwner MINTILER-DEV
+```
+
+## Sync, Install, and Add Are All the Same Command
+
+`sync`, `install`, and `add` are identical aliases that all route to the same internal pipeline. You can use whichever feels natural:
+
+```bash
+mntpack sync  MINTILER-DEV/php-asm
+mntpack install MINTILER-DEV/php-asm
+mntpack add    MINTILER-DEV/php-asm
+```
+
+Likewise, `remove`, `uninstall`, `rm`, and `unsync` all call the same removal logic:
+
+```bash
+mntpack remove   php-asm
+mntpack uninstall php-asm
+mntpack rm       php-asm
+mntpack unsync   php-asm
+```
+
+All four accept either a package name or any repository input format.
+
+## Version and Release Flags
+
+`sync` supports pinning to a specific commit or tag with `-v`/`--version`, and downloading a pre-built GitHub release asset with `-r`/`--release`:
+
+```bash
+# Pin to a tag
+mntpack sync MINTILER-DEV/scalf -v 1.2.0
+
+# Pin to a specific commit
+mntpack sync MINTILER-DEV/scalf -v 8f3c2a1
+
+# Download a specific release asset
+mntpack add MINTILER-DEV/php-asm -v v1.0.0 -r php-asm-win64.zip
+
+# Auto-detect a release asset for your platform
+mntpack install MINTILER-DEV/php-asm -r auto
+```
+
+<Note>
+`-r`/`--release` cannot be combined with a commit hash version. When used together with `-v`, the version must be a tag.
+</Note>
+
+## Package Naming Rules
+
+mntpack derives the package name from the repository name by default. For example, `MINTILER-DEV/scalf` becomes package `scalf`. You can inspect any installed package by name:
+
+```bash
+mntpack info scalf
+```
+
+### Overriding the Name
+
+Use `--name` to assign an explicit name at install time:
+
+```bash
+mntpack sync owner/repo --name mytool
+```
+
+### Conflict Handling
+
+Names are tracked across installs. If you try to sync a repository whose default name is already used by a *different* installed package, mntpack interactively prompts you to choose a custom name. Names are only considered occupied once a successful install record exists.
+
+If you sync a repository whose name matches an *already-installed package from the same repo*, mntpack treats it as an update for that package.
+
+### The Protected `mntpack` Name
+
+The package name `mntpack` is reserved. Only the `mntpack/mntpack` repository may use it, and it cannot be removed with `remove`, `uninstall`, `rm`, or `unsync`. This prevents accidental removal of the package manager itself.
+
+## Package Records
+
+After a successful install, mntpack writes a record under `~/.mntpack/packages/<name>/` that tracks everything needed to update, re-run, or remove the package. The record includes:
+
+<CardGroup cols={2}>
+  <Card title="Binary hash" icon="fingerprint">
+    SHA-256 hash pointing to the binary stored in `~/.mntpack/store/sha256/<hash>/`
+  </Card>
+  <Card title="Repository origin" icon="github">
+    Owner, repo name, and resolved GitHub URL used at install time
+  </Card>
+  <Card title="Version or commit" icon="tag">
+    The pinned version tag or commit SHA, or the latest HEAD commit at sync time
+  </Card>
+  <Card title="Package name" icon="box">
+    The resolved package name (default or custom) and whether a global shim exists
+  </Card>
+</CardGroup>
+
+The record also stores the language driver that was selected, so `reinstall`/`resync` can reproduce the build without re-detecting the project type.
+
+## Reinstalling a Package
+
+To wipe and rebuild a package from the current repository state:
+
+```bash
+mntpack reinstall scalf
+# or equivalently:
+mntpack resync scalf
+```
+
+Reinstall accepts the same `-v`, `-r`, `-n`, and `-g` flags as `sync`.
+
+## Checking Installed Packages
+
+```bash
+# List all locally installed packages
+mntpack list
+
+# List only packages with global shims
+mntpack list --global
+
+# Check which installed packages have newer commits upstream
+mntpack outdated
+
+# Find which package owns a given command name
+mntpack which phc
+```

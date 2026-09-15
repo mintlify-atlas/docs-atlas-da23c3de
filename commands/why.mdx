@@ -1,0 +1,56 @@
+---
+title: "mntpack why — Explain Why a Package Is Installed"
+sidebarTitle: "why"
+description: "Trace upward dependency paths through the mntpack dependency graph to explain which top-level package caused a given package to be installed."
+---
+
+The `why` command traverses the dependency graph stored in installed package metadata and shows you the upward paths that lead to a given package. This is particularly useful when you find a package in `mntpack list` that you don't remember explicitly installing — `why` tells you which top-level package declared it as a dependency, and how deep in the dependency chain it sits. If you installed the package directly (rather than as a transitive dependency), `why` reports that it is a top-level install.
+
+## Synopsis
+
+```bash
+mntpack why <package>
+```
+
+## Parameters
+
+<ParamField path="package" type="string" required>
+  The name of the installed package to explain. Must match the package name as tracked by mntpack (the same name shown by `mntpack list`).
+</ParamField>
+
+## Behavior
+
+<Steps>
+  <Step title="Locate the package record">
+    mntpack reads the package entry from `~/.mntpack/packages/` and retrieves its dependency metadata.
+  </Step>
+  <Step title="Walk the dependency graph upward">
+    Starting from the target package, mntpack walks the reverse dependency graph — each package that declares the target as a dependency — recursively until top-level packages (those with no parents) are reached.
+  </Step>
+  <Step title="Report dependency paths">
+    All upward paths from the target package to top-level packages are printed. If the package was installed directly by the user, it is reported as a top-level install with no parents.
+  </Step>
+</Steps>
+
+<Note>
+  Dependency relationships are read from the `dependencies` field in `mntpack.json` manifests, recorded at install time. If a dependency was added manually after initial install, `why` may not reflect that until the package is reinstalled with `mntpack reinstall`.
+</Note>
+
+## Examples
+
+```bash
+# Explain why a dependency package is present
+mntpack why some-dependency
+
+# Check if ripgrep was installed directly or pulled in by something else
+mntpack why ripgrep
+```
+
+<CardGroup cols={2}>
+  <Card title="List all packages" icon="list" href="/commands/list">
+    See every installed package with `mntpack list` to find candidates for `why`.
+  </Card>
+  <Card title="Package details" icon="circle-info" href="/commands/info">
+    Get the full installation record — repo, commit, binary path — with `mntpack info`.
+  </Card>
+</CardGroup>

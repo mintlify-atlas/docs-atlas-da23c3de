@@ -1,0 +1,188 @@
+---
+title: "Frequently Asked Questions about mntpack"
+sidebarTitle: "FAQ"
+description: "Answers to common questions about installing tools, release assets, version switching, private repos, config keys, and removing mntpack entirely."
+---
+
+This page collects the questions that come up most often when getting started with mntpack or running into unexpected behaviour. Each entry covers a specific scenario with direct commands and config examples drawn from the tool itself. If your question is not listed here, run `mntpack doctor` as a first diagnostic step — it surfaces the most common environmental issues automatically.
+
+<AccordionGroup>
+  <Accordion title="How is mntpack different from Homebrew or apt?">
+    mntpack works with **any public GitHub repository** as a package source — not just packages that have been submitted to a curated registry. There is no formula to write, no tap to create, and no approval process to wait for. Point mntpack at `owner/repo` and it clones the source, detects the build system (Rust, Python, Node, .NET, C/C++, or Generic), and builds the tool locally.
+
+    ```bash
+    # Install any GitHub project directly
+    mntpack sync owner/repo
+    mntpack sync owner/repo -g   # also create a global shim
+    ```
+
+    You can also skip building entirely and download a pre-built release asset with `-r auto` (see the next question). This is closer to what Homebrew's binary bottles provide, but without needing a maintainer to publish anything special.
+  </Accordion>
+
+  <Accordion title="Can I install a package without building from source?">
+    Yes. Use `-r auto` to let mntpack pick the most appropriate release asset for your platform:
+
+    ```bash
+    mntpack sync owner/repo -r auto
+    ```
+
+    To download a specific asset by filename:
+
+    ```bash
+    mntpack add MINTILER-DEV/php-asm -v v1.0.0 -r php-asm-win64.zip
+    ```
+
+    You can also enable the **binary cache** so mntpack checks a pre-built cache before falling back to a local build:
+
+    ```bash
+    mntpack config set binaryCache.enabled true
+    ```
+
+    When `binaryCache.enabled` is `true` and `binaryCache.repo` is set, mntpack fetches the cached binary from that repository before attempting a local build, significantly reducing install time for packages that are already in the cache.
+  </Accordion>
+
+  <Accordion title="What happens to my packages when I update mntpack itself?">
+    mntpack is installed and managed as the package `mntpack/mntpack`. Update it the same way you would any other package:
+
+    ```bash
+    mntpack update mntpack
+    # or
+    mntpack upgrade mntpack
+    ```
+
+    `update` pulls the latest commit and rebuilds from source. `upgrade` specifically downloads the latest GitHub release asset.
+
+    <Warning>
+      The `mntpack` package name is protected — you cannot remove it with `mntpack rm mntpack` or any of its aliases. To uninstall mntpack completely, you must delete the root directory manually (see the last FAQ entry).
+    </Warning>
+  </Accordion>
+
+  <Accordion title="How do I use a tool from a private GitHub repository?">
+    mntpack delegates all git operations to your system's `git` binary (configurable via `paths.git`). It does not have its own credential layer, which means your existing git authentication — SSH keys, HTTPS credentials, a credential helper, or a `~/.netrc` entry — applies automatically.
+
+    Configure git credentials the same way you would for any private repository:
+
+    ```bash
+    # SSH (recommended)
+    # Ensure your SSH key is added and ~/.ssh/config routes github.com correctly
+
+    # HTTPS credential helper
+    git config --global credential.helper osxkeychain   # macOS
+    git config --global credential.helper manager       # Windows
+    ```
+
+    Once your system git can clone the repo, mntpack can sync it:
+
+    ```bash
+    mntpack sync owner/private-repo
+    ```
+  </Accordion>
+
+  <Accordion title="Why is there both sync and update?">
+    Both commands use the same underlying pipeline, but they communicate different intent:
+
+    | Command | Semantic meaning |
+    | ------- | ---------------- |
+    | `mntpack sync owner/repo` | Primary install or reinstall — use this for first-time installs and explicit reinstalls |
+    | `mntpack update [package]` | "I already have this and want the latest commit" — reads more naturally as a maintenance operation |
+    | `mntpack upgrade [package]` | Specifically targets the latest **release asset** from GitHub Releases, not the latest commit |
+
+    `upgrade` is the meaningful distinction: it downloads a pre-built binary from GitHub Releases rather than pulling source and building locally. Use `upgrade` when you want the same behaviour as `-r auto` but as an ongoing maintenance command.
+
+    ```bash
+    mntpack update mytool    # pulls latest commit, rebuilds
+    mntpack upgrade mytool   # downloads latest release asset
+    ```
+  </Accordion>
+
+  <Accordion title="How do I run a specific version of a tool without changing the active version?">
+    Use `mntpack exec` with the `@version` syntax. The version must have been previously installed with `mntpack sync -v <version>`:
+
+    ```bash
+    # Install a specific version first
+    mntpack sync owner/repo -v v1.2.0
+
+    # Run that version once without switching the active default
+    mntpack exec owner/repo@v1.2.0 --flag value
+    ```
+
+    To permanently switch the active version for a package, use `mntpack use`:
+
+    ```bash
+    mntpack use mypackage v1.2.0
+    ```
+  </Accordion>
+
+  <Accordion title="What does autoUpdateOnRun do?">
+    When `autoUpdateOnRun` is `true`, every time you run a package — whether via its global shim or `mntpack run` — mntpack automatically runs `sync` on that package first to pull the latest version before launching it.
+
+    ```bash
+    mntpack config set autoUpdateOnRun true
+    ```
+
+    The default is `false` because the sync step adds latency to every invocation, even when nothing has changed. For most workflows, a periodic `mntpack update` or `mntpack upgrade` is preferable.
+
+    <Tip>
+      Enable `autoUpdateOnRun` only for packages that change frequently and where you always want the latest version, such as actively developed internal tools.
+    </Tip>
+  </Accordion>
+
+  <Accordion title="Can I install multiple GitHub tools from the same repository?">
+    One repository maps to one mntpack package — there is no mechanism to create two independent packages from the same repo. However, if a repository ships multiple executables you want to expose, the `bin` command map in `mntpack.json` lets you declare multiple named launchers:
+
+    ```json
+    {
+      "name": "mytool",
+      "bin": {
+        "mytool-server": "bin/server",
+        "mytool-client": "bin/client"
+      }
+    }
+    ```
+
+    Each key in `bin` becomes an available launcher that mntpack can dispatch to via `mntpack run`. A single global shim is created using the package name, but you can invoke specific sub-commands through `mntpack run`.
+  </Accordion>
+
+  <Accordion title="How do I completely remove mntpack?">
+    Because the `mntpack` package is protected, you cannot remove it with `mntpack rm`. To uninstall everything:
+
+    <Steps>
+      <Step title="Delete the mntpack root directory">
+        ```bash
+        rm -rf ~/.mntpack
+        # Or, if you set a custom root:
+        rm -rf "$MNTPACK_HOME"
+        ```
+      </Step>
+      <Step title="Remove the bin directory from your PATH">
+        Edit your shell profile (`~/.bashrc`, `~/.zshrc`, `~/.profile`, etc.) and remove any line that adds `~/.mntpack/bin` (or `$MNTPACK_HOME/bin`) to `PATH`.
+      </Step>
+      <Step title="Remove the MNTPACK_HOME variable (if set)">
+        If you added `export MNTPACK_HOME=...` to your shell profile, remove that line as well.
+      </Step>
+    </Steps>
+
+    After removing the directory and updating your shell profile, open a new terminal to confirm the `mntpack` command is no longer found.
+  </Accordion>
+
+  <Accordion title="What do I do if a sync fails partway through?">
+    A partially completed `sync` can leave the package record in an inconsistent state — for example, a repo directory with no built binary. You have two recovery paths:
+
+    **Option 1 — Reinstall the specific package:**
+
+    ```bash
+    mntpack reinstall <package>
+    # alias: mntpack resync <package>
+    ```
+
+    This removes the existing installation and performs a clean sync from scratch.
+
+    **Option 2 — Let doctor find and fix all broken packages:**
+
+    ```bash
+    mntpack doctor --fix
+    ```
+
+    Doctor scans all package records, detects missing repo directories and build artifacts, and re-runs `sync` for each affected package automatically. This is the better option when you are unsure which packages were affected or when multiple packages were interrupted at once.
+  </Accordion>
+</AccordionGroup>

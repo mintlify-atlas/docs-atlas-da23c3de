@@ -1,0 +1,47 @@
+---
+title: "mntpack outdated — Check for Newer Upstream Versions"
+sidebarTitle: "outdated"
+description: "Compare every installed package's commit hash against the upstream HEAD on GitHub and list packages where the remote has moved ahead."
+---
+
+The `outdated` command compares the commit hash recorded for each installed package against the current HEAD of the upstream GitHub repository. Any package where the remote has new commits since your last `sync` is surfaced in the output, giving you a clear list of what can be updated. Running `outdated` is a quick, read-only health check — it contacts GitHub to fetch remote HEAD references but does not download or build anything. To actually apply the updates, follow up with [`mntpack update`](/commands/update) for commit-based updates or [`mntpack upgrade`](/commands/upgrade) for release-asset-based upgrades.
+
+## Synopsis
+
+```bash
+mntpack outdated
+```
+
+## Behavior
+
+<Steps>
+  <Step title="Read installed packages">
+    mntpack reads every package record from `~/.mntpack/packages/` to collect the installed commit hash for each package.
+  </Step>
+  <Step title="Fetch remote HEAD">
+    For each package, mntpack queries GitHub to determine the current HEAD commit of the source repository's default branch (or the tracked ref, if the package was synced with `-v`).
+  </Step>
+  <Step title="Compare and report">
+    Packages where the upstream commit hash differs from the locally installed hash are listed in the output. Packages that are already at the latest commit are not shown.
+  </Step>
+</Steps>
+
+<Note>
+  `outdated` checks against the commit-level HEAD, not against semver release tags. If you installed a package using `-r/--release` and want to compare against newer release tags, use `mntpack upgrade` instead, which is release-asset-aware.
+</Note>
+
+## Examples
+
+```bash
+# Check all installed packages for newer upstream commits
+mntpack outdated
+```
+
+<CardGroup cols={2}>
+  <Card title="Update packages" icon="arrow-up-from-bracket" href="/commands/update">
+    Pull the latest commits for outdated packages with `mntpack update`.
+  </Card>
+  <Card title="Upgrade releases" icon="rocket" href="/commands/upgrade">
+    Download newer GitHub release assets with `mntpack upgrade`.
+  </Card>
+</CardGroup>

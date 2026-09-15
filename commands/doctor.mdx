@@ -1,0 +1,70 @@
+---
+title: "mntpack doctor — Check and Repair Your Installation"
+sidebarTitle: "doctor"
+description: "Diagnose broken shims, missing build artefacts, misconfigured tool paths, and PATH gaps, then optionally repair every issue automatically with --fix."
+---
+
+The `doctor` command inspects your mntpack installation for common problems and reports each finding with a clear description. By default it runs in read-only mode: it scans your environment and lists any issues it finds but makes no changes. Passing `--fix` (or `-f`) tells doctor to attempt an automatic repair for every problem it discovers — regenerating broken shims, re-adding `~/.mntpack/bin` to your shell profile, triggering lazy builds for packages whose artefacts are missing, and recreating corrupted git worktrees.
+
+## Synopsis
+
+```
+mntpack doctor [-f]
+```
+
+## Options
+
+<ParamField path="-f, --fix" type="flag">
+  Automatically repair every issue that doctor identifies. Without this flag, doctor only reports problems and exits.
+</ParamField>
+
+## What doctor Checks
+
+<AccordionGroup>
+  <Accordion title="PATH — ~/.mntpack/bin presence">
+    Verifies that `~/.mntpack/bin` (or `$MNTPACK_HOME/bin`) appears in the active `PATH`. Without this, installed shims cannot be invoked by name in your shell.
+
+    **With `--fix`:** Appends the export line to your shell profile (e.g. `~/.bashrc`, `~/.zshrc`) and reports the file modified.
+  </Accordion>
+  <Accordion title="Global shims">
+    Confirms that every shim file inside `~/.mntpack/bin/` exists on disk and that its target path resolves to a valid binary in the content-addressed store.
+
+    **With `--fix`:** Regenerates any shim whose file is missing or whose target is broken.
+  </Accordion>
+  <Accordion title="Package build artefacts">
+    For each installed package, checks that the expected build artefact is present in `~/.mntpack/store/sha256/` or the package directory. A missing artefact means the package was synced but never built (lazy-build pending) or the artefact was deleted.
+
+    **With `--fix`:** Triggers a lazy build for each package with missing artefacts, producing the binary on demand.
+  </Accordion>
+  <Accordion title="Configured tool paths">
+    Resolves each path configured under `paths.*` in `~/.mntpack/config.json` — `git`, `cargo`, `python`, `pip`, `node`, `npm`, `dotnet`, `cmake`, and `make` — and confirms that the configured executable exists and is runnable.
+
+    **With `--fix`:** doctor does not modify tool paths automatically. If a path is unreachable, it reports which config key to update and the command to use (e.g. `mntpack config set paths.cmake /usr/local/bin/cmake`).
+  </Accordion>
+  <Accordion title="Git worktree integrity">
+    For each repository under `~/.mntpack/repos/<owner>/<repo>`, verifies that the git worktree is healthy and its backing mirror under `~/.mntpack/cache/git/` is intact.
+
+    **With `--fix`:** Recreates any corrupted worktree by re-linking it to its backing mirror or re-cloning the mirror if it is also damaged.
+  </Accordion>
+</AccordionGroup>
+
+## Examples
+
+```bash
+# Check only — report issues without making any changes
+mntpack doctor
+
+# Check and automatically repair every issue found
+mntpack doctor --fix
+
+# Shorthand for --fix
+mntpack doctor -f
+```
+
+<Tip>
+  Run `mntpack doctor` after upgrading mntpack itself, moving your `MNTPACK_HOME` directory, or restoring a backup to confirm everything is wired up correctly before you rely on any installed tools.
+</Tip>
+
+<Note>
+  doctor cannot repair missing tool paths automatically — it reports the affected `paths.*` key and the exact `mntpack config set` command you need to run. Use `mntpack config set paths.<tool> <path>` to point mntpack at the correct executable.
+</Note>

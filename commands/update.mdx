@@ -1,0 +1,47 @@
+---
+title: "mntpack update — Pull Latest Commits for Packages"
+sidebarTitle: "update"
+description: "Fetch the newest commits from GitHub and rebuild installed packages from source, either one at a time or all at once."
+---
+
+The `update` command pulls the latest commits from each package's upstream repository and rebuilds the binary using the same language driver that was used at install time. This is the source-build update path — it fetches commits and compiles. If you installed a package via a release asset and want to stay on the release-asset upgrade path, use [`mntpack upgrade`](/commands/upgrade) instead.
+
+## Synopsis
+
+```bash
+mntpack update [package]
+```
+
+## Arguments
+
+<ParamField path="package" type="string">
+  Name of a single installed package to update. If omitted, mntpack updates **all** installed packages in sequence.
+</ParamField>
+
+## Behavior
+
+`update` runs the same sync pipeline used by `mntpack sync`, but anchored to the `HEAD` of the tracked branch rather than any pinned version. For each package being updated:
+
+1. The Git mirror cache at `~/.mntpack/cache/git/` is fetched for new commits.
+2. The linked worktree under `~/.mntpack/repos/<owner>/<repo>` is advanced to the latest commit.
+3. The detected language driver rebuilds the project.
+4. The new binary is stored in `~/.mntpack/store/sha256/<hash>/`.
+5. The package record is updated to point to the new store entry.
+
+<Note>
+  `update` uses the **commit pull** flow and always builds from source. To update packages that were installed via release assets (using `-r`), use `mntpack upgrade`, which uses the `--release auto` flow instead.
+</Note>
+
+<Tip>
+  Running `mntpack outdated` first will show you which packages have newer upstream commits available, so you can decide whether to update selectively or all at once.
+</Tip>
+
+## Examples
+
+```bash
+# Update every installed package
+mntpack update
+
+# Update a single package by name
+mntpack update ripgrep
+```

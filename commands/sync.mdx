@@ -1,0 +1,114 @@
+---
+title: "mntpack sync — Install a Package from GitHub"
+sidebarTitle: "sync"
+description: "Clone or download a GitHub repository and build it into mntpack's content-addressed store, optionally pinning a version or downloading a release asset."
+---
+
+The `sync` command is the primary way to install packages with mntpack. Given a repository reference, it clones a mirror into the local cache, checks out the requested version, detects the project's language driver, builds the binary (or downloads a release asset), stores it in `~/.mntpack/store/sha256/<hash>/`, registers a package record, and optionally creates a global shim in `~/.mntpack/bin/`. Also available as `add` and `install`.
+
+## Synopsis
+
+```bash
+mntpack sync <repo> [-v <version>] [-r <asset|auto>] [-n <name>] [-g]
+```
+
+## Arguments and Flags
+
+<ParamField path="repo" type="string" required>
+  Repository to install. Accepts three forms:
+  - **Shorthand** — `ripgrep` (uses `defaultOwner` from config, default: `mntpack`)
+  - **Owner/repo** — `BurntSushi/ripgrep`
+  - **Full URL** — `https://github.com/BurntSushi/ripgrep.git`
+</ParamField>
+
+<ParamField path="-v, --version" type="string">
+  Tag or commit hash to check out. When used together with `-r/--release`, the value **must** be a tag — commit hashes are rejected.
+</ParamField>
+
+<ParamField path="-r, --release" type="string">
+  Release asset to download instead of building from source. Accepts:
+  - An exact asset filename — e.g. `tool-linux-x64.tar.gz`
+  - `auto` — automatically selects an asset for the current OS and architecture
+
+  The `auto` matcher looks for strings matching the current platform (`win`, `linux`, `macos`) and architecture (`x64`, `arm64`, `x86`) in the asset filename.
+</ParamField>
+
+<ParamField path="-n, --name" type="string">
+  Custom package name to register. Defaults to the repository name. Useful when you want to install the same tool under a different alias or when a name conflict exists.
+</ParamField>
+
+<ParamField path="-g, --global" type="boolean">
+  Create a global shim in `~/.mntpack/bin/` (or `$MNTPACK_HOME/bin/`) so the tool is available on your `PATH` without a full `mntpack run` invocation.
+</ParamField>
+
+## How sync Works
+
+<Steps>
+  <Step title="Clone or update mirror">
+    mntpack fetches the repository into the local Git mirror cache at `~/.mntpack/cache/git/`. Subsequent syncs pull only new commits.
+  </Step>
+  <Step title="Create or update worktree">
+    A linked Git worktree is checked out under `~/.mntpack/repos/<owner>/<repo>` at the requested version (or the latest commit if `-v` is omitted).
+  </Step>
+  <Step title="Detect language driver">
+    mntpack inspects the worktree root for known project files and selects the appropriate driver:
+
+    | File detected | Driver |
+    |---|---|
+    | `Cargo.toml` | Rust |
+    | `requirements.txt` / `pyproject.toml` | Python |
+    | `package.json` | Node.js |
+    | `*.csproj` / `*.sln` | .NET / C# |
+    | `CMakeLists.txt` / `Makefile` | C/C++ |
+    | `mntpack.json` | Generic |
+  </Step>
+  <Step title="Build or download">
+    If `-r` is provided, mntpack downloads the specified release asset (or detects one with `auto`). Otherwise, the language driver compiles the project from source.
+  </Step>
+  <Step title="Store binary">
+    The resulting binary is moved into the content-addressed store at `~/.mntpack/store/sha256/<hash>/<binary>`. Version aliases are tracked under `~/.mntpack/store/versions/<repo>/<version>/`.
+  </Step>
+  <Step title="Register package record">
+    A package record is written to `~/.mntpack/packages/` linking the package name to its store entry and repository.
+  </Step>
+  <Step title="Create shim (if -g)">
+    When `--global` is set, a shim script is placed in `~/.mntpack/bin/`. Rust projects use their Cargo binary name for the shim; other drivers use the package name.
+  </Step>
+</Steps>
+
+<Warning>
+  You cannot combine `-r` with a commit hash in `-v`. When downloading a release asset, `-v` must reference a tag (e.g. `14.1.0` or `v14.1.0`).
+</Warning>
+
+<Note>
+  If the package name you're installing is already taken by a **different** repository, mntpack will interactively prompt you to choose a custom name. You can avoid the prompt by passing `--name` explicitly.
+</Note>
+
+<Tip>
+  The `mntpack` package name is reserved and cannot be claimed by any repository other than `mntpack/mntpack`.
+</Tip>
+
+## Examples
+
+```bash
+# Shorthand (resolves using defaultOwner from config)
+mntpack sync ripgrep
+
+# Full owner/repo with a global shim
+mntpack sync BurntSushi/ripgrep -g
+
+# Pin to a specific tag
+mntpack sync BurntSushi/ripgrep -v 14.1.0
+
+# Download the best release asset for your OS/arch, install globally
+mntpack sync BurntSushi/ripgrep -r auto -g
+
+# Download a specific release asset at a known tag
+mntpack sync owner/repo -v 1.2.0 -r tool-linux-x64.tar.gz
+
+# Install with a custom package name
+mntpack sync owner/repo --name mytool -g
+
+# Full GitHub URL
+mntpack sync https://github.com/owner/repo.git -v v1.0.0
+```

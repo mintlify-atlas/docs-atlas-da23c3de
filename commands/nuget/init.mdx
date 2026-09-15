@@ -1,0 +1,77 @@
+---
+title: "mntpack nuget init — Set Up NuGet.config for Local Feed"
+sidebarTitle: "nuget init"
+description: "Create or update NuGet.config in a project directory to register the mntpack-local source, pointing dotnet at ~/.mntpack/nuget/feed/ for local packages."
+---
+
+`mntpack nuget init` creates or updates a `NuGet.config` file to include the managed `mntpack-local` source. The source entry points `dotnet` at the local feed directory (`~/.mntpack/nuget/feed/`) so that any `.nupkg` built and published there by `mntpack nuget source build` becomes resolvable during `dotnet restore` and `dotnet add package`. Running `init` is safe on an existing `NuGet.config` — mntpack only adds the `mntpack-local` source entry if it is not already present, leaving every other source untouched.
+
+<Note>
+  `mntpack nuget init` has the alias `ensure`, so `mntpack nuget ensure` is equivalent.
+</Note>
+
+## Synopsis
+
+```
+mntpack nuget init [--path <dir>] [--project <file>]
+```
+
+## Parameters
+
+<ParamField path="--path" type="directory path">
+  Directory in which to write (or update) `NuGet.config`. Defaults to the current working directory.
+</ParamField>
+
+<ParamField path="--project" type="file path">
+  Path to a `.csproj` or `.sln` file. When provided, mntpack resolves the target directory from the project file's parent folder rather than from `--path`.
+</ParamField>
+
+## Behavior
+
+1. Resolves the target directory from `--path` or `--project` (current directory if neither is given).
+2. Reads any existing `NuGet.config` in that directory.
+3. Checks whether a source named `mntpack-local` already exists.
+4. If absent, appends a `<add key="mntpack-local" value="..." />` entry under `<packageSources>` pointing at `~/.mntpack/nuget/feed/`.
+5. Writes the updated (or newly created) `NuGet.config`.
+
+<Warning>
+  mntpack expands the home directory to an absolute path when writing the feed URL. The resulting `NuGet.config` is therefore machine-specific and should typically be added to `.gitignore`.
+</Warning>
+
+## Examples
+
+Initialize in the current directory:
+
+```bash
+mntpack nuget init
+```
+
+Initialize for a specific subdirectory:
+
+```bash
+mntpack nuget init --path ./src/MyProject
+```
+
+Derive the target directory from a project file:
+
+```bash
+mntpack nuget init --project src/MyProject/MyProject.csproj
+```
+
+## What gets written
+
+A minimal generated `NuGet.config` looks like this:
+
+```xml
+<?xml version="1.0" encoding="utf-8"?>
+<configuration>
+  <packageSources>
+    <add key="nuget.org" value="https://api.nuget.org/v3/index.json" protocolVersion="3" />
+    <add key="mntpack-local" value="/home/user/.mntpack/nuget/feed/" />
+  </packageSources>
+</configuration>
+```
+
+<Tip>
+  `mntpack nuget use` calls `init` internally, so you only need to run `init` manually when you want to prepare `NuGet.config` before adding packages individually with `mntpack nuget add`.
+</Tip>

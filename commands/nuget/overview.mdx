@@ -1,0 +1,79 @@
+---
+title: "mntpack nuget — Local NuGet Feed Management"
+sidebarTitle: "Overview"
+description: "Manage a local NuGet feed and source-backed C# package recipes with mntpack nuget — from init and source registration to per-project reference management."
+---
+
+The `mntpack nuget` family of commands gives C# projects a fully managed, source-backed local NuGet feed. mntpack maintains the feed directory at `~/.mntpack/nuget/feed/` and tracks source package state at `~/.mntpack/nuget/state/`. When a project needs a package built from a GitHub repository, mntpack clones the source, runs `dotnet restore`, `dotnet build`, and `dotnet pack`, then publishes the resulting `.nupkg` into the feed under the NuGet source name `mntpack-local`. Consumer-side commands write the matching `NuGet.config`, add package references, and restore the target project — all in a single command.
+
+## Subcommand categories
+
+<CardGroup cols={3}>
+  <Card title="nuget init" icon="gear" href="/commands/nuget/init">
+    Create or update `NuGet.config` in a directory or project to include the `mntpack-local` source pointing at `~/.mntpack/nuget/feed/`.
+  </Card>
+  <Card title="nuget add / use / remove" icon="cube" href="/commands/nuget/add-use-remove">
+    Add, replace, or remove NuGet package references. `use` is the all-in-one path that builds, configures, and restores in one step.
+  </Card>
+  <Card title="nuget source" icon="code-branch" href="/commands/nuget/source">
+    Register GitHub C# repositories as source-backed package recipes, then build them into the local feed with `source build` or `source build-all`.
+  </Card>
+  <Card title="nuget feed" icon="folder-open" href="/commands/nuget/feed">
+    Inspect the local feed: print its absolute path or list every `.nupkg` currently published there.
+  </Card>
+  <Card title="nuget cache clear" icon="trash" href="/commands/nuget/add-use-remove#nuget-cache-clear">
+    Remove stale entries from the global NuGet package cache for packages that have been rebuilt locally with the same version number.
+  </Card>
+  <Card title="nuget refresh" icon="arrows-rotate" href="/commands/nuget/add-use-remove#nuget-refresh">
+    One-shot sync: update all source repos, rebuild packages, clear stale cache entries, and restore the consumer project.
+  </Card>
+</CardGroup>
+
+## Storage layout
+
+| Path | Purpose |
+|------|---------|
+| `~/.mntpack/nuget/feed/` | Local NuGet feed — contains all built `.nupkg` files |
+| `~/.mntpack/nuget/state/` | Source package state tracked by mntpack |
+| `NuGet.config` (project-local) | Written by `init` / `use`, registers `mntpack-local` source |
+
+## Typical workflow
+
+<Steps>
+  <Step title="Register a GitHub source package">
+    Tell mntpack about a GitHub C# repository and the project file to build:
+
+    ```bash
+    mntpack nuget source add CS2Luau.Roblox \
+      --repo MINTILER-DEV/CS2Luau \
+      --project src/CS2Luau.Roblox/CS2Luau.Roblox.csproj \
+      --package-id CS2Luau.Roblox \
+      --version 1.0.0-local.1
+    ```
+  </Step>
+  <Step title="Build it into the local feed">
+    Clone the repo, pack it, and publish the `.nupkg` to `~/.mntpack/nuget/feed/`:
+
+    ```bash
+    mntpack nuget source build CS2Luau.Roblox
+    ```
+  </Step>
+  <Step title="Initialize NuGet.config">
+    Write (or update) `NuGet.config` in the current directory so that `dotnet` can resolve packages from the local feed:
+
+    ```bash
+    mntpack nuget init
+    ```
+  </Step>
+  <Step title="Add the package reference and restore">
+    Use the all-in-one command to check the feed, write `NuGet.config` if needed, add the reference, and restore the project:
+
+    ```bash
+    mntpack nuget use CS2Luau.Roblox 1.0.0-local.1
+    ```
+  </Step>
+</Steps>
+
+<Tip>
+  `mntpack nuget use` collapses steps 3 and 4 — and will also trigger `source build` automatically if `--auto-build` was set when the source was registered.
+</Tip>

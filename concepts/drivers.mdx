@@ -1,0 +1,198 @@
+---
+title: "Language Drivers: How mntpack Builds Any Project"
+sidebarTitle: "Drivers"
+description: "How mntpack's driver system detects a project's language, runs the right build command, and locates the resulting binary for any GitHub repository."
+---
+
+When you sync a package, mntpack does not rely on you telling it what kind of project it is. Instead it walks through a priority-ordered list of **language drivers**, each of which knows how to detect, build, and locate the binary for one ecosystem. The first driver whose detection criteria match the repository wins, and its build logic runs. This page documents every driver, its detection trigger, its build command, and the edge cases that affect binary resolution.
+
+## Driver Detection Order
+
+Drivers are evaluated in this fixed order. The first match is used; remaining drivers are skipped.
+
+<Steps>
+  <Step title="Rust">
+    **Trigger:** `Cargo.toml` present at repository root
+
+    **Build:** `cargo build --release`
+
+    Reads the `[package] name` field from `Cargo.toml` to predict the output binary name, then looks for it in `target/release/`. Hyphens in the crate name are normalized to underscores to match Rust's executable naming convention. On Windows the expected suffix is `.exe`.
+
+    If the name cannot be predicted, mntpack scans `target/release/` and picks the single executable found (failing if there is more than one candidate and no `mntpack.json` `bin` field to disambiguate).
+  </Step>
+  <Step title="Python">
+    **Trigger:** `requirements.txt` **or** `pyproject.toml` present at repository root
+
+    **Build:** `pip install -r requirements.txt` (when `requirements.txt` exists)
+
+    The pip executable used is the one configured at `paths.pip` (default: `pip`). No binary is produced by the driver itself; the resulting launch command must be declared via the `run` or `bin` field in `mntpack.json`.
+  </Step>
+  <Step title="Node.js">
+    **Trigger:** `package.json` present at repository root
+
+    **Build:** `npm install`
+
+    The npm executable is taken from `paths.npm` (default: `npm`). Like Python, no native binary is expected; the `run` or `bin` field in `mntpack.json` provides the launch command.
+  </Step>
+  <Step title="C / C++">
+    **Trigger:** `CMakeLists.txt`, `Makefile`, or `makefile` present at repository root
+
+    **Build (CMake path):**
+    ```bash
+    cmake -S . -B .mntpack-build -DCMAKE_BUILD_TYPE=Release
+    cmake --build .mntpack-build --config Release
+    ```
+
+    **Build (Make path):** `make`
+
+    CMake is preferred over Make when `CMakeLists.txt` is present. The build output directory for CMake is `.mntpack-build/` inside the repository. After building, mntpack searches for executables in `.mntpack-build/Release/` (CMake multi-config) or `.mntpack-build/` (single-config), falling back to the repository root for Makefile builds.
+
+    Binary selection prefers a file whose stem matches the package name; otherwise the most-recently-modified executable is chosen.
+  </Step>
+  <Step title=".NET / C#">
+    **Trigger:** Any of the following at repository root: `*.csproj`, `*.sln`, `*.slnx`, `Directory.Build.props`, `Directory.Build.targets`, `global.json`
+
+    **Build:** `dotnet build` in Release mode
+
+    Before building, the driver ensures the project-local `NuGet.config` contains the mntpack-managed local source (`mntpack-local`). If the `mntpack.json` manifest declares NuGet packages under the `nuget` field and no custom `build` command is set, those packages are applied to the project before the build runs.
+
+    A custom `build` shell command in `mntpack.json` overrides `dotnet build` entirely.
+  </Step>
+  <Step title="Generic (fallback)">
+    **Trigger:** Always matches — used when no other driver detects the project
+
+    **Build:** optional `build` shell command from `mntpack.json`
+
+    The Generic driver requires a `mntpack.json` to function beyond simple binary discovery. Without it, mntpack searches for an executable in `target/release/`, `bin/`, `dist/`, `build/`, and the repository root. If nothing is found and there is no `mntpack.json`, the install fails with a descriptive error.
+  </Step>
+</Steps>
+
+## Tool Path Configuration
+
+Every external tool invoked by the drivers resolves its executable from the `paths` config section. Set these if the tools are not on your PATH or if you need a specific version:
+
+```bash
+mntpack config set paths.cargo  /usr/local/bin/cargo
+mntpack config set paths.cmake  cmake
+mntpack config set paths.make   make
+mntpack config set paths.dotnet dotnet
+mntpack config set paths.npm    npm
+mntpack config set paths.pip    pip3
+```
+
+## Binary Auto-Discovery Fallback
+
+When a driver builds successfully but cannot determine which file is the result, mntpack's shared auto-discovery logic searches these directories in order:
+
+1. `target/release/`
+2. `bin/`
+3. `dist/`
+4. `build/`
+5. Repository root
+
+Within each directory, files are scanned up to five levels deep. On Unix, a file must have the executable bit set. On Windows, a file must have a `.exe` extension.
+
+Selection priority within the candidates:
+1. A file whose **stem matches the package name** (case-insensitive)
+2. The **only** candidate (if exactly one is found)
+3. The alphabetically first candidate (as a last resort)
+
+<Tip>
+If auto-discovery picks the wrong binary, add a `bin` field to `mntpack.json` to specify the path explicitly:
+
+```json
+{
+  "bin": "build/my-exact-tool"
+}
+```
+</Tip>
+
+## The Generic Driver and `mntpack.json`
+
+The Generic driver is the most flexible but also the most explicit. It covers projects that don't fit any standard ecosystem — shell scripts, PHP tools, pre-compiled assets, anything.
+
+<Accordion title="Run command only (no binary required)">
+For tools that launch via an interpreter rather than a native binary, declare a `run` command. No binary is stored in the SHA-256 store; the shim calls the run command directly.
+
+```json
+{
+  "name": "php-asm",
+  "run": "php asm.php"
+}
+```
+
+Per-platform run commands are also supported:
+
+```json
+{
+  "run": {
+    "windows-x64": "php asm.php",
+    "linux-x64":   "php asm.php",
+    "macos-arm64": "php asm.php"
+  }
+}
+```
+</Accordion>
+
+<Accordion title="Build step + run command">
+If the project needs a build step before it can run, add a `build` field. mntpack executes it as a shell command, then uses the `run` field for launching.
+
+```json
+{
+  "name": "tool",
+  "build": "npm run build",
+  "run": "node dist/index.js"
+}
+```
+</Accordion>
+
+<Accordion title="Command map (bin)">
+Use the `bin` object form to define multiple named launch commands from one package. Each key becomes a separate shim:
+
+```json
+{
+  "bin": {
+    "phc": "php phc.php"
+  }
+}
+```
+
+`phc` becomes both the shim name and the command executed when that shim is invoked.
+</Accordion>
+
+## .NET Driver: NuGet Integration
+
+The .NET driver has additional responsibilities beyond calling `dotnet build`:
+
+<Steps>
+  <Step title="Ensure NuGet.config">
+    Writes or updates the project-local `NuGet.config` to include the mntpack-managed local feed source (`mntpack-local`) pointing to `~/.mntpack/nuget/feed/`.
+  </Step>
+  <Step title="Apply manifest NuGet packages">
+    If `mntpack.json` has a `nuget.packages` list and no custom `build` command is set, each declared package is added to the target `.csproj` or `.sln` before building.
+
+    ```json
+    {
+      "nuget": {
+        "packages": [
+          "Newtonsoft.Json@13.0.3",
+          { "name": "My.Local.Package", "version": "1.0.0", "source": "mntpack-local" }
+        ]
+      }
+    }
+    ```
+  </Step>
+  <Step title="Build in Release mode">
+    Calls `dotnet build` targeting Release configuration, or executes the custom `build` shell command if one is present in `mntpack.json`.
+  </Step>
+</Steps>
+
+## Inspecting Driver Detection
+
+Before installing, you can see which driver would be selected for any public repository:
+
+```bash
+mntpack inspect owner/repo
+```
+
+This clones (or refreshes) the repository and reports its detected language, build steps, and manifest contents without running a full install.

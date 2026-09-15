@@ -1,0 +1,229 @@
+---
+title: 'Managing NuGet Packages with a Local mntpack Feed'
+sidebarTitle: 'NuGet Guide'
+description: 'Learn how mntpack builds C# packages from GitHub into a local NuGet feed and wires them into your .NET projects automatically.'
+---
+
+mntpack manages a local NuGet feed at `~/.mntpack/nuget/feed/` that lets you build C# packages directly from GitHub source and consume them in any .NET project — no private feed service, no manual `dotnet pack` steps. There are two distinct roles: **source maintainers** who register and build GitHub C# projects into the feed, and **consumers** who declare which packages their project needs and let mntpack wire up `NuGet.config`, add references, and restore.
+
+## How the local feed works
+
+When mntpack detects a .NET repository it automatically ensures a project-local `NuGet.config` contains a source named `mntpack-local` that points to `~/.mntpack/nuget/feed/`. Any package packed into that directory is immediately available to `dotnet restore` without further configuration.
+
+<Note>
+  The `MNTPACK_HOME` environment variable overrides the `~/.mntpack` root, so the feed path becomes `$MNTPACK_HOME/nuget/feed/` when set.
+</Note>
+
+---
+
+## Source-backed workflow
+
+Use the source-backed workflow when you own or maintain a C# library on GitHub and want every developer (or CI pipeline) to build and consume it locally without publishing to NuGet.org.
+
+<Steps>
+  <Step title="Register the GitHub project as a NuGet source">
+    Run `mntpack nuget source add` to record the GitHub repository, the `.csproj` to build, the NuGet package ID, and the local version label:
+
+    ```bash
+    mntpack nuget source add CS2Luau.Roblox \
+      --repo MINTILER-DEV/CS2Luau \
+      --project src/CS2Luau.Roblox/CS2Luau.Roblox.csproj \
+      --package-id CS2Luau.Roblox \
+      --version 1.0.0-local.1
+    ```
+
+    This writes a recipe entry into `mntpack.json` under `nugetSources` so the definition is committed alongside your project.
+  </Step>
+
+  <Step title="Build the package into the local feed">
+    ```bash
+    mntpack nuget source build CS2Luau.Roblox
+    ```
+
+    mntpack clones the referenced GitHub repository, runs `dotnet pack` in Release mode against the specified `.csproj`, and deposits the resulting `.nupkg` into `~/.mntpack/nuget/feed/`. Pass `--force` to rebuild even when a cached artifact already exists.
+  </Step>
+
+  <Step title="Verify what is in the feed (optional)">
+    ```bash
+    mntpack nuget feed list   # list packages in the local feed
+    mntpack nuget feed path   # print the feed directory path
+    ```
+  </Step>
+</Steps>
+
+### Additional source commands
+
+| Command | Purpose |
+|---|---|
+| `mntpack nuget source list` | Show all registered source recipes |
+| `mntpack nuget source build-all --force` | Rebuild every registered source |
+| `mntpack nuget source update <name>` | Pull latest commits and rebuild |
+| `mntpack nuget source sync --force` | Sync all sources in one pass |
+
+---
+
+## Consumer workflow
+
+Use the consumer workflow when you want to add a NuGet package — either from the local feed or from a public source — to a `.NET` project that mntpack manages.
+
+### All-in-one with `nuget use`
+
+`mntpack nuget use` is the recommended single command for consuming a local-feed package. It:
+
+1. Checks whether the package exists in the local feed
+2. Builds the registered source recipe if the package is missing
+3. Updates `mntpack.json` with the package declaration
+4. Writes or updates `NuGet.config` with the `mntpack-local` source
+5. Adds the `<PackageReference>` to the target project
+6. Runs `dotnet restore`
+
+```bash
+mntpack nuget use CS2Luau.Roblox 1.0.0-local.1
+```
+
+Pass `--project` to target a specific `.csproj` when the working directory contains multiple projects:
+
+```bash
+mntpack nuget use CS2Luau.Roblox 1.0.0-local.1 --project src/MyApp/MyApp.csproj
+```
+
+### Step-by-step
+
+<Tabs>
+  <Tab title="Minimal (three steps)">
+    ```bash
+    # 1. Write NuGet.config with the mntpack-local source
+    mntpack nuget init
+
+    # 2. Add the package reference and update mntpack.json
+    mntpack nuget add CS2Luau.Roblox 1.0.0-local.1 --source mntpack-local
+
+    # 3. Restore the project
+    mntpack nuget restore
+    ```
+  </Tab>
+  <Tab title="Full pipeline">
+    ```bash
+    # Ensure NuGet.config exists with mntpack-local
+    mntpack nuget init --project src/MyApp/MyApp.csproj
+
+    # Add a public package (no --source needed)
+    mntpack nuget add Newtonsoft.Json 13.0.3
+
+    # Add a local-feed package
+    mntpack nuget add CS2Luau.Roblox 1.0.0-local.1 --source mntpack-local
+
+    # Apply all mntpack.json nuget declarations to the project
+    mntpack nuget apply --project src/MyApp/MyApp.csproj
+
+    # Restore
+    mntpack nuget restore --project src/MyApp/MyApp.csproj
+    ```
+  </Tab>
+</Tabs>
+
+---
+
+## Declaring packages in `mntpack.json`
+
+Both source recipes and consumer package lists can be declared directly in `mntpack.json`, making the entire NuGet setup reproducible from source control.
+
+### `nugetSources` — build recipes
+
+```json
+{
+  "nugetSources": {
+    "CS2Luau.Roblox": {
+      "type": "github",
+      "repo": "MINTILER-DEV/CS2Luau",
+      "project": "src/CS2Luau.Roblox/CS2Luau.Roblox.csproj",
+      "packageId": "CS2Luau.Roblox",
+      "version": "1.0.0-local.1",
+      "outputMode": "feed"
+    }
+  }
+}
+```
+
+<Accordion title="nugetSources field reference">
+  | Field | Type | Description |
+  |---|---|---|
+  | `type` | string | Source type — currently `"github"` (default) |
+  | `repo` | string | GitHub repo as `owner/repo` or full URL |
+  | `ref` | string | Optional git ref (branch, tag, or commit) |
+  | `subdir` | string | Optional subdirectory to work in |
+  | `project` | string | Path to `.csproj` relative to the repo root |
+  | `solution` | string | Path to `.sln` when building an entire solution |
+  | `packageId` | string | NuGet package ID to emit; defaults to the source name |
+  | `version` | string | Version label to stamp on the packed `.nupkg` |
+  | `configuration` | string | Build configuration — defaults to `"Release"` |
+  | `outputMode` | string | How the output is stored — `"feed"` (default) |
+  | `autoBuild` | bool | Automatically build when referenced |
+  | `autoUpdate` | bool | Automatically pull and rebuild on update |
+</Accordion>
+
+### `nuget` — consumer declarations
+
+The `nuget.packages` array accepts both a short string form (`"Package@version"`) and a detailed object form:
+
+```json
+{
+  "nuget": {
+    "packages": [
+      "Newtonsoft.Json@13.0.3",
+      { "name": "CS2Luau.Roblox", "version": "1.0.0-local.1", "source": "mntpack-local" }
+    ]
+  }
+}
+```
+
+Apply the full list to a project at any time with:
+
+```bash
+mntpack nuget apply --project src/MyApp/MyApp.csproj
+```
+
+---
+
+## Cache management
+
+When you rebuild a source package under the **same version label**, `dotnet restore` may still serve the old `.nupkg` from the global NuGet HTTP cache. Clear the stale entry so the next restore picks up the freshly built artifact:
+
+```bash
+# Clear cache for all versions of a package
+mntpack nuget cache clear CS2Luau.Roblox
+
+# Clear cache for a specific version only
+mntpack nuget cache clear CS2Luau.Roblox 1.0.0-local.1
+```
+
+### One-shot refresh
+
+`mntpack nuget refresh` chains everything together: sync sources, rebuild, clear cache, and restore the consumer project:
+
+```bash
+mntpack nuget refresh
+
+# Force rebuild even when the source has not changed
+mntpack nuget refresh --force --build
+```
+
+<Warning>
+  `refresh` always clears the global NuGet cache for managed packages. Run it deliberately in CI pipelines to avoid unnecessary network traffic or accidental cache evictions.
+</Warning>
+
+---
+
+## Removing a package
+
+```bash
+mntpack nuget remove CS2Luau.Roblox
+```
+
+This removes the `<PackageReference>` from the project file, updates `mntpack.json`, and optionally restores. Pass `--no-restore` to skip the automatic restore step.
+
+---
+
+<Note>
+  For a full reference of every `nuget` subcommand and flag, see the [NuGet command overview](/commands/nuget/overview).
+</Note>

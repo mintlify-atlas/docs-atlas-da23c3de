@@ -1,0 +1,168 @@
+---
+title: "Diagnosing and Repairing mntpack with doctor"
+sidebarTitle: "Doctor"
+description: "Use mntpack doctor to audit tool paths, shim integrity, and installed package state — then pass --fix to automatically repair common issues."
+---
+
+The `mntpack doctor` command inspects your entire mntpack installation in one pass: it checks that essential tools (git, cargo, node, etc.) are reachable, that every global shim points to a valid binary, that package build artifacts are present, and that `~/.mntpack/bin` is on your `PATH`. When problems are detected, re-running with `--fix` lets mntpack repair them automatically — regenerating missing shims, re-syncing broken packages, and ensuring the bin directory is wired into your shell environment.
+
+## Running a health check
+
+Run `doctor` at any time to get a snapshot of your installation state. It prints one tab-separated line per item so the output is easy to parse or pipe.
+
+```bash
+mntpack doctor
+```
+
+Sample output:
+
+```
+root        /home/alice/.mntpack
+config      /home/alice/.mntpack/config.json
+bin         /home/alice/.mntpack/bin
+store       /home/alice/.mntpack/store
+cache       /home/alice/.mntpack/cache
+nuget       /home/alice/.mntpack/nuget
+git         ok      (git)
+python      ok      (python)
+pip         ok      (pip)
+cargo       ok      (cargo)
+node        ok      (node)
+npm         ok      (npm)
+dotnet      missing (dotnet)
+cmake       ok      (cmake)
+make        ok      (make)
+issues      1
+missing tools: dotnet
+```
+
+The final `issues <n>` line gives a machine-readable count — zero means everything is healthy.
+
+## Auto-repairing common issues
+
+Pass `--fix` (or `-f`) to attempt automatic repair of every issue doctor finds.
+
+```bash
+mntpack doctor --fix
+```
+
+When `--fix` is active, doctor:
+
+1. Calls `ensure_bin_on_path` to add `~/.mntpack/bin` to your shell profile if it is absent.
+2. Re-runs `sync` for every package whose repo directory or build artifact is missing.
+3. Regenerates shim files for globally installed packages whose shim is missing but whose record is intact.
+
+The final line reports how many items were repaired:
+
+```
+fixed   3
+```
+
+## What doctor checks and can fix
+
+<CardGroup cols={2}>
+  <Card title="PATH integration" icon="terminal">
+    Verifies `~/.mntpack/bin` (or `$MNTPACK_HOME/bin`) appears in your `PATH`.
+    `--fix` writes the export to your shell profile automatically.
+  </Card>
+  <Card title="Global shims" icon="link">
+    Checks that a shim file exists for every package installed with `-g`.
+    `--fix` recreates missing shim files using the existing package record.
+  </Card>
+  <Card title="Build artifacts" icon="package">
+    Detects packages whose content-addressed binary is absent from the store.
+    `--fix` re-runs `sync` to rebuild or re-download the missing artifact.
+  </Card>
+  <Card title="Tool paths" icon="wrench">
+    Probes each configured executable — `git`, `python`, `pip`, `cargo`, `node`, `npm`, `dotnet`, `cmake`, `make` — by running `--version`.
+    Missing tools are reported; fix them by updating the matching `paths.*` config key.
+  </Card>
+</CardGroup>
+
+<Note>
+  Doctor cannot fix a missing system tool such as `dotnet` or `cmake` for you — it can only tell you which ones are absent. Set the path to the correct executable with `mntpack config set paths.dotnet /usr/bin/dotnet`, or install the tool through your system package manager.
+</Note>
+
+## When to use doctor
+
+Run `mntpack doctor` in these situations:
+
+<Steps>
+  <Step title="After moving or renaming your home directory">
+    All absolute paths in shim files and package records will be stale. `--fix` re-syncs affected packages and rewrites shims to use current paths.
+  </Step>
+  <Step title="After changing MNTPACK_HOME">
+    If you relocate your mntpack root by changing the `MNTPACK_HOME` environment variable, doctor confirms the new layout is coherent and reports any packages that need a re-sync.
+  </Step>
+  <Step title="After a failed sync or interrupted build">
+    An interrupted `mntpack sync` can leave a package record without a corresponding build artifact. Doctor detects this and `--fix` completes the installation.
+  </Step>
+  <Step title="When a shim command is not found in your shell">
+    If typing a globally installed command returns `command not found`, doctor will confirm whether the shim exists and whether `~/.mntpack/bin` is on `PATH`.
+  </Step>
+</Steps>
+
+## Common scenarios
+
+<AccordionGroup>
+  <Accordion title="Shim not found after install">
+    After running `mntpack sync owner/repo -g`, the shim is written to `~/.mntpack/bin` but the directory may not yet be on your `PATH`.
+
+    ```bash
+    mntpack doctor
+    # Look for a PATH warning in the output
+
+    mntpack doctor --fix
+    # Adds ~/.mntpack/bin to your shell profile
+    ```
+
+    Open a new terminal (or run `source ~/.bashrc` / `source ~/.zshrc`) for the change to take effect. If the shim file itself is missing, `--fix` will regenerate it from the package record.
+  </Accordion>
+
+  <Accordion title="Build fails with tool not found">
+    When a build driver cannot locate a required tool (e.g., `cmake not found`), doctor reports it under `missing tools`. Fix it by pointing mntpack at the correct executable:
+
+    ```bash
+    mntpack config set paths.cmake /usr/local/bin/cmake
+    mntpack config set paths.make make
+    ```
+
+    Run `mntpack doctor` again to confirm the tool is now reachable.
+  </Accordion>
+
+  <Accordion title="Package binary missing after sync">
+    Some packages use a lazy-build strategy — the binary is built on first run rather than during `sync`. If doctor reports `binary missing`, trigger the build by running the package:
+
+    ```bash
+    mntpack run <package>
+    ```
+
+    Alternatively, use `mntpack doctor --fix` to force a full re-sync for all packages with missing artifacts.
+  </Accordion>
+
+  <Accordion title="Worktree or repo directory errors during sync">
+    If a git worktree becomes corrupted (e.g., after an interrupted operation or manual directory manipulation), subsequent `sync` calls may fail. Doctor with `--fix` detects missing repo directories and re-clones them:
+
+    ```bash
+    mntpack doctor --fix
+    ```
+
+    This is equivalent to running `mntpack reinstall <package>` for each affected package, but applies to all of them in a single pass.
+  </Accordion>
+</AccordionGroup>
+
+## Reading doctor output
+
+Each line follows the format `<category>\t<status>\t(<detail>)`. Status values:
+
+| Status    | Meaning                                              |
+| --------- | ---------------------------------------------------- |
+| `ok`      | The item passed its check                            |
+| `missing` | The item could not be found or verified              |
+| `fixed`   | The item was repaired (only appears with `--fix`)    |
+
+The summary lines at the end — `issues <n>` and `fixed <n>` — give totals across all categories.
+
+<Tip>
+  Pipe `mntpack doctor` through `grep missing` to quickly surface only the failing checks in large installations.
+</Tip>

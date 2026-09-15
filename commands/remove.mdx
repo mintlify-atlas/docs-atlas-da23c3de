@@ -1,0 +1,56 @@
+---
+title: "mntpack remove — Uninstall a Package"
+sidebarTitle: "remove"
+description: "Delete a package's binary, records, and global shims from the mntpack store, and clean up the cloned repo when no other packages depend on it."
+---
+
+The `remove` command uninstalls a package that was previously installed with `sync`. It deletes the package record, removes any global shims associated with the package, and — when no other installed packages still reference the same repository — removes the cloned worktree from `~/.mntpack/repos/`. Also available as `uninstall`, `rm`, and `unsync`.
+
+## Synopsis
+
+```bash
+mntpack remove <repo_or_package>
+```
+
+## Arguments
+
+<ParamField path="repo_or_package" type="string" required>
+  The package to remove. Accepts the same forms as `sync`:
+  - **Package name** — `ripgrep` (the name registered at install time)
+  - **Owner/repo** — `BurntSushi/ripgrep`
+  - **Full URL** — `https://github.com/BurntSushi/ripgrep.git`
+  - **Shorthand** — `ripgrep` (resolved against `defaultOwner` if no matching package name is found)
+</ParamField>
+
+## Behavior
+
+When `remove` runs, it performs these steps in order:
+
+1. Resolves the argument to an installed package record.
+2. Removes the package's binary entries from `~/.mntpack/store/` and the package folder under `~/.mntpack/packages/`.
+3. Deletes any global shim(s) for the package from `~/.mntpack/bin/`.
+4. If no other installed packages reference the same `owner/repo`, removes the linked worktree from `~/.mntpack/repos/<owner>/<repo>`.
+
+<Warning>
+  The `mntpack` package is protected and cannot be removed. Running `mntpack remove mntpack` (or any alias) will be rejected to prevent accidental self-removal.
+</Warning>
+
+<Note>
+  Removing a package does **not** automatically clean up the Git mirror cache at `~/.mntpack/cache/git/`. Use `mntpack clean` or `mntpack clean --repos` to reclaim that space separately.
+</Note>
+
+## Examples
+
+```bash
+# Remove by package name
+mntpack remove ripgrep
+
+# Short alias
+mntpack rm mytool
+
+# Using full owner/repo form
+mntpack uninstall BurntSushi/ripgrep
+
+# Using unsync alias
+mntpack unsync owner/repo
+```

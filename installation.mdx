@@ -1,0 +1,159 @@
+---
+title: 'Install mntpack on macOS, Linux, or Windows'
+sidebarTitle: 'Installation'
+description: 'Build mntpack from source, run the self-contained installer, and add ~/.mntpack/bin to PATH — everything you need to get mntpack running on any platform.'
+---
+
+mntpack is distributed as source code and ships with a dedicated installer binary (`mntpack-installer`) that embeds the main `mntpack` binary at compile time. The installer sets up the directory structure under `~/.mntpack/`, places a global shim, adds the shim directory to your PATH, and performs a post-install self-sync to pull the latest version — all in one step.
+
+## Prerequisites
+
+Before installing mntpack, make sure the following tools are available on your system:
+
+- **Rust toolchain** — required to build mntpack itself. Install from [rustup.rs](https://rustup.rs).
+- **git** — required by all language drivers for cloning repositories.
+- Any additional toolchains you intend to use with mntpack:
+
+| Language driver | Required tool |
+|---|---|
+| Rust | `cargo` (part of the Rust toolchain) |
+| Python | `python`, `pip` |
+| Node.js | `node`, `npm` |
+| .NET / C# | `dotnet` SDK |
+| C/C++ (CMake) | `cmake`, `make` |
+| C/C++ (Make) | `make` |
+
+<Tip>
+  mntpack will still install and run correctly even if some toolchain tools are missing. Drivers are only invoked when you sync a repository that needs them. You can set custom executable paths later via `mntpack config set paths.<tool> <path>`.
+</Tip>
+
+## Build and install
+
+<Steps>
+  <Step title="Clone the mntpack repository">
+    Clone the repository from GitHub to get both the main CLI and the installer:
+
+    ```bash
+    git clone https://github.com/mntpack/mntpack.git
+    cd mntpack
+    ```
+  </Step>
+
+  <Step title="Build mntpack">
+    Compile the main `mntpack` binary in release mode. The installer will embed this binary automatically during its own build:
+
+    ```bash
+    cargo build --release
+    ```
+
+    The compiled binary is placed at `target/release/mntpack`.
+  </Step>
+
+  <Step title="Build the installer">
+    Move into the installer sub-project and build it. Because the installer embeds the `mntpack` binary at build time, run this step **after** building `mntpack`:
+
+    ```bash
+    cd mntpack-installer
+    cargo build --release
+    ```
+
+    The resulting installer binary at `target/release/mntpack-installer` is fully self-contained.
+  </Step>
+
+  <Step title="Run the installer">
+    Execute the installer binary:
+
+    ```bash
+    ./target/release/mntpack-installer
+    ```
+
+    The installer will:
+
+    - Prompt for an **install base directory** (default: your home directory, e.g. `~`)
+    - Create `<base>/.mntpack/{repos,packages,store,cache,nuget,bin}`
+    - Install `mntpack` as a managed package at `packages/mntpack`
+    - Store the payload in `store/sha256/<hash>/...`
+    - Create a `mntpack` shim in `.mntpack/bin/`
+    - Run a post-install managed self-sync (`sync mntpack/mntpack --name mntpack -g`) to pull the latest version
+    - Add `.mntpack/bin` to your PATH
+    - Set `MNTPACK_HOME` for custom install root support
+  </Step>
+
+  <Step title="Reload your shell">
+    The installer modifies your shell profile to add `~/.mntpack/bin` to `PATH` and export `MNTPACK_HOME`, but the current shell session needs to be refreshed to pick up those changes:
+
+    ```bash
+    source ~/.bashrc    # bash
+    source ~/.zshrc     # zsh
+    ```
+
+    Or simply open a new terminal window.
+  </Step>
+
+  <Step title="Verify the installation">
+    Confirm mntpack is on your PATH and working:
+
+    ```bash
+    mntpack --version
+    ```
+
+    You should see the installed version string. If the command is not found, ensure `~/.mntpack/bin` (or your custom `MNTPACK_HOME/bin`) is in your `PATH`.
+  </Step>
+</Steps>
+
+## Custom install root
+
+By default mntpack roots everything at `~/.mntpack/`. To use a different directory — for example on a secondary drive or inside a project — set `MNTPACK_HOME` before running the installer:
+
+```bash
+export MNTPACK_HOME=/opt/mntpack
+./target/release/mntpack-installer
+```
+
+Every subsequent `mntpack` invocation will use that directory as its root as long as `MNTPACK_HOME` is set in the environment. The shim in `$MNTPACK_HOME/bin/` also honours this variable at runtime.
+
+<Note>
+  You can change `MNTPACK_HOME` after installation, but you will need to move the entire `~/.mntpack` directory to the new location and update the environment variable in your shell profile.
+</Note>
+
+## Windows notes
+
+The installer creates a `mntpack.cmd` shim in `.mntpack\bin\` in addition to the Unix-style shim so that `mntpack` works from Command Prompt and PowerShell without WSL.
+
+<Warning>
+  Windows path separators and environment variable syntax differ from Unix. If you set a custom `MNTPACK_HOME`, use a Windows-style absolute path (e.g. `C:\Users\you\.mntpack`) and ensure `%MNTPACK_HOME%\bin` is added to the system or user `PATH`.
+</Warning>
+
+## What gets installed
+
+After a successful installation, your `~/.mntpack/` directory contains:
+
+```text
+~/.mntpack/
+  config.json          # default configuration (auto-created)
+  repos/               # git worktree checkouts
+  packages/
+    mntpack/           # mntpack itself, managed as a package
+  store/
+    sha256/            # content-addressed binary store
+  cache/
+    git/               # git mirror cache
+    exec/
+    binary-cache/
+  nuget/
+    feed/
+    state/
+  bin/
+    mntpack            # global shim (mntpack.cmd on Windows)
+```
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="rocket" href="/quickstart">
+    Install your first tool from GitHub and learn the core workflow.
+  </Card>
+  <Card title="Configuration" icon="sliders" href="/commands/config">
+    Set default owner, tool paths, auto-update behaviour, and binary cache options.
+  </Card>
+</CardGroup>

@@ -1,0 +1,161 @@
+---
+title: "Managing Multiple Versions of Installed Tools"
+sidebarTitle: "Version Management"
+description: "Install side-by-side versions of any GitHub tool, switch between them instantly, check for updates, and upgrade via release assets — all from the mntpack CLI."
+---
+
+mntpack tracks every version of a package you install in its content-addressed store, letting you run side-by-side versions, switch the active one without reinstalling, and keep packages up to date through either a source-pull or release-asset upgrade path.
+
+## Installing Multiple Versions Side by Side
+
+Run `mntpack sync` (or its aliases `add` / `install`) with `-v` for each version you want available locally. Each version is stored independently under `~/.mntpack/store/versions/<owner>/<repo>/<version-or-commit>/`.
+
+```bash
+mntpack sync BurntSushi/ripgrep -v 13.0.0
+mntpack sync BurntSushi/ripgrep -v 14.1.0
+```
+
+Both versions are retained in the store simultaneously. The most recently synced version becomes the default.
+
+## Switching the Active Version
+
+Use `mntpack use` to change which installed version is resolved when you invoke the package. The version argument supports **prefix matching** — you only need to provide enough characters to be unambiguous.
+
+```bash
+mntpack use ripgrep 14        # activates the 14.x install (prefix match)
+mntpack use ripgrep 13.0.0    # activates the exact 13.0.0 install
+```
+
+<Note>
+  `use` only changes the active pointer for that package. All other installed versions remain in the store and can be switched to at any time without re-downloading or rebuilding.
+</Note>
+
+## Running a Specific Version Without Switching
+
+`mntpack exec` runs a package at an exact installed version inline, without changing the active version for any other invocation. The `@version` suffix accepts the same prefix matching rules as `use`.
+
+```bash
+mntpack exec ripgrep@13 -- --version
+mntpack exec ripgrep@14.1.0 -- --help
+```
+
+The `--` separator is optional but recommended when passing flags that could be misinterpreted by mntpack itself.
+
+## Inspecting Installed Packages
+
+<CardGroup cols={2}>
+  <Card title="List all packages" icon="list">
+    ```bash
+    mntpack list
+    mntpack list --global     # only packages with global shims
+    ```
+  </Card>
+  <Card title="Package details" icon="circle-info">
+    ```bash
+    mntpack info ripgrep
+    ```
+    Shows installed versions, active version, store paths, and source repo.
+  </Card>
+</CardGroup>
+
+## Checking for Outdated Packages
+
+`mntpack outdated` compares the commit that each installed package was built from against the current `HEAD` of its upstream repository. Any package where the upstream has advanced will be listed.
+
+```bash
+mntpack outdated
+```
+
+No packages are modified by this command — it is a read-only comparison.
+
+## Updating Packages
+
+mntpack provides two distinct update strategies depending on whether you want to pull the latest commit or the latest release asset.
+
+<Tabs>
+  <Tab title="update — commit pull">
+    `update` runs the full sync pipeline: pulls the latest commits from the upstream repository mirror and rebuilds from source (or re-downloads the most recent matching release if `-r` was used during the original install).
+
+    ```bash
+    mntpack update              # update all installed packages
+    mntpack update ripgrep      # update one package
+    ```
+  </Tab>
+  <Tab title="upgrade — release assets">
+    `upgrade` fetches the latest GitHub release asset (equivalent to `-r auto`) and replaces the installed binary, then updates the package record. Use this when you want pre-built binaries and don't need to track unreleased commits.
+
+    ```bash
+    mntpack upgrade             # upgrade all packages via release assets
+    mntpack upgrade ripgrep     # upgrade one package via release asset
+    ```
+  </Tab>
+</Tabs>
+
+<Tip>
+  Enable `autoUpdateOnRun` to have mntpack automatically sync a package before launching it:
+  ```bash
+  mntpack config set autoUpdateOnRun true
+  ```
+  When this is set, running a package via its global shim or `mntpack run` will trigger an update check first.
+</Tip>
+
+## Reinstalling from Scratch
+
+`mntpack reinstall` (alias: `resync`) tears down the existing install for a package and runs the full sync pipeline from a clean state. It accepts the same flags as `sync`.
+
+```bash
+mntpack reinstall ripgrep                  # reinstall active version from source
+mntpack reinstall ripgrep -v 14.1.0 -r auto   # reinstall a specific version via release asset
+```
+
+<Warning>
+  `reinstall` removes the existing package record and binary artifacts before rebuilding. If the upstream source or release asset is unavailable, the package will be left in an uninstalled state.
+</Warning>
+
+## Version Storage Layout
+
+Version aliases are stored at:
+
+```text
+~/.mntpack/store/versions/<owner>/<repo>/<version-or-commit>/
+```
+
+The primary binary for each version is additionally deduplicated in the content-addressed store at:
+
+```text
+~/.mntpack/store/sha256/<hash>/<binary>
+```
+
+This means two packages (or two versions of the same package) that produce identical binaries share a single store entry.
+
+## Version Management Workflow
+
+<Steps>
+  <Step title="Install the versions you need">
+    ```bash
+    mntpack sync BurntSushi/ripgrep -v 13.0.0
+    mntpack sync BurntSushi/ripgrep -v 14.1.0
+    ```
+  </Step>
+  <Step title="Verify what is installed">
+    ```bash
+    mntpack info ripgrep
+    ```
+  </Step>
+  <Step title="Switch to the version you want active">
+    ```bash
+    mntpack use ripgrep 14
+    ```
+  </Step>
+  <Step title="Run a different version ad-hoc without switching">
+    ```bash
+    mntpack exec ripgrep@13 -- --version
+    ```
+  </Step>
+  <Step title="Keep packages current">
+    ```bash
+    mntpack outdated          # see what has upstream changes
+    mntpack update            # pull latest commits for all packages
+    ```
+  </Step>
+</Steps>

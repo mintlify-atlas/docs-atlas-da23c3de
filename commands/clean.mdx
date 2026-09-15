@@ -1,0 +1,62 @@
+---
+title: "mntpack clean — Remove Cached Build Artifacts"
+sidebarTitle: "clean"
+description: "Free disk space by clearing mntpack's exec and binary caches, and optionally removing orphaned repository worktrees that no installed package references."
+---
+
+The `clean` command reclaims disk space by removing files that mntpack accumulates during normal operation. Without any flags it targets the cache directories — `~/.mntpack/cache/exec/` and `~/.mntpack/cache/binary-cache/` — leaving your installed packages, shims, and repository clones untouched. Pass `--repos` when you also want to remove git worktrees and their backing mirrors for repositories that are no longer referenced by any installed package.
+
+## Synopsis
+
+```
+mntpack clean [--repos]
+```
+
+## Options
+
+<ParamField path="--repos" type="flag">
+  In addition to clearing the cache, remove orphaned repository directories under `~/.mntpack/repos/<owner>/<repo>` and their corresponding git mirror caches under `~/.mntpack/cache/git/`. A repository is considered orphaned when no currently installed package was synced from it.
+</ParamField>
+
+## What Gets Cleaned
+
+<Tabs>
+  <Tab title="Default (cache only)">
+    Running `mntpack clean` without flags removes the contents of:
+
+    | Directory | Contents |
+    |-----------|----------|
+    | `~/.mntpack/cache/exec/` | Ephemeral exec artefacts produced by `mntpack exec` |
+    | `~/.mntpack/cache/binary-cache/` | Locally cached release assets downloaded from `binaryCache.repo` |
+
+    Installed packages, global shims in `~/.mntpack/bin/`, the content-addressed store under `~/.mntpack/store/sha256/`, and all repository clones are **not** affected.
+  </Tab>
+  <Tab title="With --repos">
+    Running `mntpack clean --repos` performs the default cache clear and also removes:
+
+    | Directory | Contents |
+    |-----------|----------|
+    | `~/.mntpack/repos/<owner>/<repo>` | git worktrees for repositories that no installed package uses |
+    | `~/.mntpack/cache/git/<owner>__<repo>.git` | Backing bare-mirror for each removed worktree |
+
+    Repositories still referenced by at least one installed package are left in place.
+  </Tab>
+</Tabs>
+
+<Note>
+  `clean` does not remove installed packages or their build artefacts from `~/.mntpack/store/`. To fully remove a package, use [`mntpack remove`](/commands/remove).
+</Note>
+
+## Examples
+
+```bash
+# Clear the exec and binary caches only
+mntpack clean
+
+# Also remove repository clones that no installed package references
+mntpack clean --repos
+```
+
+<Tip>
+  Run `mntpack clean --repos` after uninstalling several packages to free the most disk space. You can always re-clone a repository the next time you sync its package.
+</Tip>

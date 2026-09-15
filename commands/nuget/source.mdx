@@ -1,0 +1,211 @@
+---
+title: "mntpack nuget source — Register GitHub C# Repos as Packages"
+sidebarTitle: "nuget source"
+description: "Register GitHub C# repositories as source-backed NuGet package recipes, then clone, build, and publish them into the local mntpack feed with nuget source build."
+---
+
+`mntpack nuget source` manages the source-backed package recipes stored in `mntpack.json` under the `nugetSources` key. Each recipe tells mntpack where to find a GitHub C# repository, which project or solution file to build, and what NuGet package ID and version to assign the resulting `.nupkg`. When a recipe is built, mntpack clones (or updates) the repository, runs `dotnet restore`, `dotnet build`, and `dotnet pack`, and publishes the output into the managed local feed at `~/.mntpack/nuget/feed/`. From that point on, any project whose `NuGet.config` includes `mntpack-local` can resolve the package.
+
+---
+
+## mntpack nuget source add
+
+Registers a new source-backed package recipe in `mntpack.json`. Does not clone or build anything — use `source build` for that.
+
+### Synopsis
+
+```
+mntpack nuget source add <name>
+    --repo <owner/repo|url>
+    [--ref <ref>]
+    [--subdir <dir>]
+    [--project <file.csproj>]
+    [--solution <file>]
+    [--package-id <id>]
+    [--version <ver>]
+    [--configuration <Release|Debug>]
+    [--path <dir>]
+    [--auto-build]
+```
+
+### Parameters
+
+<ParamField path="name" type="string" required>
+  Local identifier for this recipe (used as the key in `nugetSources` and as the argument to `source build`, `source update`, etc.).
+</ParamField>
+
+<ParamField path="--repo" type="string" required>
+  GitHub repository in `owner/repo` shorthand or a full HTTPS URL.
+</ParamField>
+
+<ParamField path="--ref" type="string">
+  Git ref (branch, tag, or commit SHA) to check out. Defaults to the repository's default branch.
+</ParamField>
+
+<ParamField path="--subdir" type="directory path">
+  Subdirectory within the cloned repository to treat as the project root.
+</ParamField>
+
+<ParamField path="--project" type="file path">
+  Relative path to the `.csproj` file to build and pack, relative to the repository root (or `--subdir`).
+</ParamField>
+
+<ParamField path="--solution" type="file path">
+  Relative path to a `.sln` file. Use in place of `--project` when the repository uses a solution file.
+</ParamField>
+
+<ParamField path="--package-id" type="string">
+  NuGet package ID to assign when packing. Defaults to the project's `<PackageId>` property.
+</ParamField>
+
+<ParamField path="--version" type="string">
+  Version string for the generated `.nupkg` (e.g. `1.0.0-local.1`). Overrides the project file's `<Version>`.
+</ParamField>
+
+<ParamField path="--configuration" type="string">
+  Build configuration passed to `dotnet build` and `dotnet pack`. Defaults to `Release`.
+</ParamField>
+
+<ParamField path="--path" type="directory path">
+  Directory containing the `mntpack.json` to update. Defaults to the current directory.
+</ParamField>
+
+<ParamField path="--auto-build" type="boolean">
+  Mark the recipe so that `mntpack nuget use` automatically triggers `source build` whenever the package is missing from the feed.
+</ParamField>
+
+### Generated mntpack.json entry
+
+After running `source add`, mntpack writes a record like this into `mntpack.json`:
+
+```json
+{
+  "nugetSources": {
+    "CS2Luau.Roblox": {
+      "type": "github",
+      "repo": "MINTILER-DEV/CS2Luau",
+      "project": "src/CS2Luau.Roblox/CS2Luau.Roblox.csproj",
+      "packageId": "CS2Luau.Roblox",
+      "version": "1.0.0-local.1",
+      "outputMode": "feed"
+    }
+  }
+}
+```
+
+---
+
+## mntpack nuget source list
+
+Lists all source-backed package recipes registered in `mntpack.json` for the target directory.
+
+### Synopsis
+
+```
+mntpack nuget source list [--path <dir>]
+```
+
+---
+
+## mntpack nuget source build
+
+Clones or updates the registered repository for a single recipe, then runs `dotnet restore` + `dotnet build` + `dotnet pack` and copies the resulting `.nupkg` into `~/.mntpack/nuget/feed/`.
+
+### Synopsis
+
+```
+mntpack nuget source build <name> [--path <dir>] [--force]
+```
+
+<ParamField path="name" type="string" required>
+  Recipe name as registered with `source add`.
+</ParamField>
+
+<ParamField path="--force" type="boolean">
+  Rebuild and re-publish even if the same version already exists in the feed.
+</ParamField>
+
+<Warning>
+  If the package version in the feed is the same as what the build would produce, re-running `source build` without `--force` is a no-op. Use `--force` when you've made local changes to the source repository.
+</Warning>
+
+---
+
+## mntpack nuget source build-all
+
+Builds every recipe registered in `mntpack.json` into the local feed. Equivalent to running `source build` for each recipe in sequence.
+
+### Synopsis
+
+```
+mntpack nuget source build-all [--path <dir>] [--force]
+```
+
+---
+
+## mntpack nuget source update
+
+Fetches the latest commits for a single registered source repository without rebuilding. Useful when you want to pull upstream changes and then decide whether to rebuild.
+
+### Synopsis
+
+```
+mntpack nuget source update <name> [--path <dir>]
+```
+
+---
+
+## mntpack nuget source sync
+
+Fetches the latest commits for all registered source repositories. Use `source sync` as the first step of a manual update workflow before calling `source build-all`.
+
+### Synopsis
+
+```
+mntpack nuget source sync [--path <dir>] [--force]
+```
+
+<ParamField path="--force" type="boolean">
+  Force a clean re-clone rather than a fast-forward fetch for each repository.
+</ParamField>
+
+---
+
+## Full workflow example
+
+<Steps>
+  <Step title="Register the source recipe">
+    ```bash
+    mntpack nuget source add CS2Luau.Roblox \
+      --repo MINTILER-DEV/CS2Luau \
+      --project src/CS2Luau.Roblox/CS2Luau.Roblox.csproj \
+      --package-id CS2Luau.Roblox \
+      --version 1.0.0-local.1
+    ```
+  </Step>
+  <Step title="Verify the recipe was saved">
+    ```bash
+    mntpack nuget source list
+    ```
+  </Step>
+  <Step title="Build and publish to the local feed">
+    ```bash
+    mntpack nuget source build CS2Luau.Roblox
+    ```
+  </Step>
+  <Step title="Update sources and rebuild everything (later)">
+    ```bash
+    mntpack nuget source sync
+    mntpack nuget source build-all --force
+    ```
+  </Step>
+  <Step title="Update a single source repo">
+    ```bash
+    mntpack nuget source update CS2Luau.Roblox
+    ```
+  </Step>
+</Steps>
+
+<Tip>
+  For day-to-day use, `mntpack nuget refresh` combines `source sync`, `source build-all`, `cache clear`, and `restore` into one command. See [nuget add / use / remove](/commands/nuget/add-use-remove#nuget-refresh) for details.
+</Tip>

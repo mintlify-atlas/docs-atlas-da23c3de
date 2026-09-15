@@ -1,0 +1,327 @@
+---
+title: "Authoring mntpack.json for Custom Build and Run Config"
+sidebarTitle: "Manifest"
+description: "Define how mntpack builds, launches, and resolves binaries for your package using an optional mntpack.json manifest at the repository root."
+---
+
+`mntpack.json` is an optional manifest file placed at the root of a repository. When present, it gives mntpack precise instructions for how to build the project, which binary to use, how to launch the tool on each platform, and which dependencies to install first. Packages that rely on interpreted runtimes (PHP, Node, Python scripts) or non-standard build pipelines benefit most from authoring a manifest — but even simple projects can use it to override the default package name or inject pre/post-install hooks.
+
+## Supported Fields
+
+<AccordionGroup>
+  <Accordion title="name — package name override">
+    **Type:** `string`
+
+    Overrides the default package name (which is normally the repository name). Useful when the repo name is ambiguous or conflicts with another installed package.
+
+    ```json
+    { "name": "php-asm" }
+    ```
+  </Accordion>
+
+  <Accordion title="version — version string">
+    **Type:** `string`
+
+    Declares the package version. This is informational and does not affect the install flow; mntpack tracks versions through Git refs.
+
+    ```json
+    { "version": "1.0.0" }
+    ```
+  </Accordion>
+
+  <Accordion title="preinstall — shell command run before build">
+    **Type:** `string`
+
+    A shell command executed before the build step. Use this to install system dependencies, generate code, or validate the environment.
+
+    ```json
+    { "preinstall": "npm ci" }
+    ```
+  </Accordion>
+
+  <Accordion title="postinstall — shell command run after build">
+    **Type:** `string`
+
+    A shell command executed after a successful build. Use this for asset copying, permission fixes, or any cleanup step.
+
+    ```json
+    { "postinstall": "chmod +x scripts/setup.sh && scripts/setup.sh" }
+    ```
+  </Accordion>
+
+  <Accordion title="dependencies — other mntpack packages to install first">
+    **Type:** `string[]`
+
+    An array of mntpack package names that must be installed before this package is built or run. mntpack resolves and installs them in order.
+
+    ```json
+    { "dependencies": ["php", "composer"] }
+    ```
+  </Accordion>
+
+  <Accordion title="build — custom build command">
+    **Type:** `string`
+
+    Overrides the default build command for the detected language driver. When omitted, each driver uses its standard build procedure (e.g. `cargo build --release` for Rust, `npm run build` for Node). Set this field only when you need a non-standard build pipeline.
+
+    ```json
+    { "build": "npm run build" }
+    ```
+  </Accordion>
+
+  <Accordion title="run — launch command (single string or per-target map)">
+    **Type:** `string | { [target: string]: string }`
+
+    Defines the command mntpack uses to launch the package. This is the **recommended** field for any interpreter-driven tool. It can be a single string applied to all platforms, or a map keyed by target identifier.
+
+    ```json
+    { "run": "php asm.php" }
+    ```
+
+    ```json
+    {
+      "run": {
+        "linux-x64": "./tool",
+        "windows-x64": "tool.exe"
+      }
+    }
+    ```
+
+    Supported target keys: `windows-x64`, `windows-x86`, `linux-x64`, `linux-arm64`, `macos-x64`, `macos-arm64`.
+  </Accordion>
+
+  <Accordion title="bin — binary path or command map">
+    **Type:** `string | { [name: string]: string }`
+
+    Legacy field. As a plain string it points to a compiled binary path. As an object it maps shim names to launch commands — each key becomes a launcher/shim command name.
+
+    ```json
+    { "bin": "dist/mytool" }
+    ```
+
+    ```json
+    { "bin": { "phc": "php phc.php" } }
+    ```
+
+    <Note>
+      Prefer `run` over `bin` for command-driven launchers. `bin` as a command map is still fully supported for packages that expose multiple named entry points.
+    </Note>
+  </Accordion>
+
+  <Accordion title="release — platform asset map">
+    **Type:** `{ [target: string]: { file: string, bin: string } }`
+
+    Maps target identifiers to GitHub release asset filenames and the binary path within the extracted archive. mntpack consults this map when `-r auto` is requested, letting you hard-code the correct asset name for each platform rather than relying on filename pattern matching.
+
+    ```json
+    {
+      "release": {
+        "linux-x64":   { "file": "tool-linux-x64.tar.gz",  "bin": "tool" },
+        "linux-arm64": { "file": "tool-linux-arm64.tar.gz", "bin": "tool" },
+        "macos-arm64": { "file": "tool-macos-arm64.tar.gz", "bin": "tool" },
+        "windows-x64": { "file": "tool-win64.zip",          "bin": "tool.exe" }
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="nuget — NuGet package declarations">
+    **Type:** `{ packages: (string | { name: string, version?: string, source?: string })[] }`
+
+    Declares NuGet package requirements for .NET projects managed alongside mntpack. Packages can be expressed as a `"Name@version"` string or as a detailed object with an optional `source` key. The special source value `"mntpack-local"` points to the managed local feed.
+
+    ```json
+    {
+      "nuget": {
+        "packages": [
+          "Newtonsoft.Json@13.0.3",
+          { "name": "My.Local.Package", "version": "1.0.0", "source": "mntpack-local" }
+        ]
+      }
+    }
+    ```
+  </Accordion>
+
+  <Accordion title="nugetSources — source-backed C# package recipes">
+    **Type:** `{ [name: string]: NugetSourceDefinition }`
+
+    Declares GitHub C# repositories that mntpack should clone, build, and pack into the managed local NuGet feed. Each key becomes the source name used in `mntpack nuget source` commands.
+
+    ```json
+    {
+      "nugetSources": {
+        "CS2Luau.Roblox": {
+          "type": "github",
+          "repo": "MINTILER-DEV/CS2Luau",
+          "project": "src/CS2Luau.Roblox/CS2Luau.Roblox.csproj",
+          "packageId": "CS2Luau.Roblox",
+          "version": "1.0.0-local.1",
+          "outputMode": "feed"
+        }
+      }
+    }
+    ```
+  </Accordion>
+</AccordionGroup>
+
+## The `run` Field in Depth
+
+`run` is the preferred way to define how an interpreted or script-based tool is launched. mntpack selects the command that matches the current platform at runtime.
+
+<Tabs>
+  <Tab title="Single command (all platforms)">
+    ```json
+    {
+      "name": "php-asm",
+      "run": "php asm.php"
+    }
+    ```
+
+    The same command is used on every OS and architecture. Ideal for fully cross-platform scripts.
+  </Tab>
+  <Tab title="Per-target commands">
+    ```json
+    {
+      "name": "my-tool",
+      "run": {
+        "linux-x64":   "php asm.php",
+        "linux-arm64": "php asm.php",
+        "macos-arm64": "php asm.php",
+        "windows-x64": "php asm.php"
+      }
+    }
+    ```
+
+    Specify different launch commands per platform. Targets not listed fall back to `unknown` and will not launch unless an exact match is found.
+  </Tab>
+</Tabs>
+
+**Supported target keys:**
+
+| Key            | Platform         | Architecture |
+|----------------|-----------------|--------------|
+| `windows-x64`  | Windows          | x86\_64      |
+| `windows-x86`  | Windows          | x86          |
+| `linux-x64`    | Linux            | x86\_64      |
+| `linux-arm64`  | Linux            | aarch64      |
+| `macos-x64`    | macOS            | x86\_64      |
+| `macos-arm64`  | macOS            | aarch64      |
+
+## The `bin` Command Map
+
+When a package exposes multiple named entry points, use `bin` as an object. Each key becomes a separate shim name; each value is the launch command for that shim.
+
+```json
+{
+  "bin": {
+    "phc":    "php phc.php",
+    "phc-ls": "php phc-ls.php"
+  }
+}
+```
+
+In this example mntpack creates shims named `phc` and `phc-ls`, each wired to their respective PHP script.
+
+<Note>
+  `run` and `bin` (as a command map) are mutually exclusive in practice. Use `run` when there is one primary entry point; use `bin` as a command map when there are multiple named entry points.
+</Note>
+
+## The `release` Field
+
+The `release` map lets you explicitly declare which release asset to use per platform instead of relying on filename heuristics. Each entry specifies the archive filename as it appears on the GitHub release page and the path to the binary within the extracted archive.
+
+```json
+{
+  "release": {
+    "linux-x64": {
+      "file": "tool-linux-x64.tar.gz",
+      "bin":  "tool"
+    },
+    "macos-arm64": {
+      "file": "tool-macos-arm64.tar.gz",
+      "bin":  "tool"
+    },
+    "windows-x64": {
+      "file": "tool-win64.zip",
+      "bin":  "tool.exe"
+    }
+  }
+}
+```
+
+When a user runs `mntpack sync owner/repo -r auto`, mntpack checks `release` for a matching target key and uses the declared `file` value instead of pattern-matching against release asset filenames.
+
+## `build` Is Optional
+
+Language drivers provide sensible defaults for every supported project type. You only need `build` when the default command would be wrong for your project.
+
+<Tabs>
+  <Tab title="No build step (generic script)">
+    ```json
+    {
+      "name": "php-asm",
+      "run": "php asm.php"
+    }
+    ```
+
+    No compilation required — mntpack simply registers the launch command.
+  </Tab>
+  <Tab title="Custom build + run">
+    ```json
+    {
+      "name": "tool",
+      "build": "npm run build",
+      "run":   "node dist/index.js"
+    }
+    ```
+
+    The `build` field overrides the Node driver's default and `run` defines the launch command after the build succeeds.
+  </Tab>
+  <Tab title="With pre/post hooks">
+    ```json
+    {
+      "name":        "my-cli",
+      "preinstall":  "npm ci",
+      "build":       "npm run build",
+      "postinstall": "chmod +x dist/cli.js",
+      "run":         "node dist/cli.js"
+    }
+    ```
+
+    Hooks run before and after the build step in the order `preinstall → build → postinstall`.
+  </Tab>
+</Tabs>
+
+## Complete Manifest Example
+
+Below is a realistic `mntpack.json` for a PHP-based CLI tool that ships prebuilt release assets and also works as a source install.
+
+```json
+{
+  "name": "php-asm",
+  "version": "2.0.0",
+  "dependencies": ["php"],
+  "run": "php asm.php",
+  "bin": {
+    "phc": "php phc.php"
+  },
+  "release": {
+    "linux-x64": {
+      "file": "php-asm-linux-x64.tar.gz",
+      "bin":  "php-asm"
+    },
+    "macos-arm64": {
+      "file": "php-asm-macos-arm64.tar.gz",
+      "bin":  "php-asm"
+    },
+    "windows-x64": {
+      "file": "php-asm-win64.zip",
+      "bin":  "php-asm.exe"
+    }
+  }
+}
+```
+
+<Tip>
+  Place `mntpack.json` at the repository root alongside your existing project files. mntpack reads it automatically during any `sync`, `reinstall`, or `run` operation — no extra flags are needed.
+</Tip>

@@ -1,0 +1,164 @@
+---
+title: "mntpack config — Read and Write Configuration"
+sidebarTitle: "config"
+description: "Inspect and modify every setting in ~/.mntpack/config.json using dot-notation keys, from tool paths and default owner to binary cache and sync dispatch settings."
+---
+
+The `config` command gives you direct access to `~/.mntpack/config.json` without needing to open the file in a text editor. You can print the entire configuration, read or write individual keys using dot-notation for nested fields, or restore every setting to its factory default. Changes take effect immediately on the next mntpack command — no restart or reload is required.
+
+## Synopsis
+
+```
+mntpack config show
+mntpack config get <key>
+mntpack config set <key> <value>
+mntpack config reset
+```
+
+## Subcommands
+
+<ParamField path="show" type="subcommand">
+  Print the full contents of `~/.mntpack/config.json` as formatted JSON.
+</ParamField>
+
+<ParamField path="get <key>" type="subcommand">
+  Print the current value of a single configuration key. Use dot notation to address nested fields (e.g. `paths.cargo`, `binaryCache.enabled`).
+</ParamField>
+
+<ParamField path="set <key> <value>" type="subcommand">
+  Write a value to the specified key and save the updated config. Accepts string values and the boolean literals `true` and `false`. Use dot notation for nested keys.
+</ParamField>
+
+<ParamField path="reset" type="subcommand">
+  Restore every configuration key to its default value. This overwrites `~/.mntpack/config.json` entirely.
+</ParamField>
+
+## Configuration Keys
+
+All keys, their types, and their defaults (sourced from `src/config.rs`):
+
+### General
+
+<ParamField path="defaultOwner" type="string" default="mntpack">
+  The GitHub owner (user or organisation) used when you sync a package by repository name alone, without an explicit `owner/` prefix. For example, with `defaultOwner` set to `myorg`, running `mntpack sync mytool` resolves to `myorg/mytool`.
+</ParamField>
+
+<ParamField path="autoUpdateOnRun" type="boolean" default="false">
+  When `true`, global shims call `mntpack run <package>` which triggers a sync before launching the binary. When `false`, shims execute the binary directly without checking for updates.
+</ParamField>
+
+### Tool Paths (`paths.*`)
+
+mntpack invokes external tools during builds. These keys let you point mntpack at non-default executables — useful when tools are not on your system `PATH` or when you need a specific version.
+
+<ParamField path="paths.git" type="string" default="git">
+  Path to the `git` executable.
+</ParamField>
+
+<ParamField path="paths.python" type="string" default="python">
+  Path to the Python interpreter used by the Python driver.
+</ParamField>
+
+<ParamField path="paths.pip" type="string" default="pip">
+  Path to `pip`, used to install Python dependencies.
+</ParamField>
+
+<ParamField path="paths.node" type="string" default="node">
+  Path to the Node.js runtime used by the Node.js driver.
+</ParamField>
+
+<ParamField path="paths.npm" type="string" default="npm">
+  Path to `npm`, used to install Node.js dependencies and run build scripts.
+</ParamField>
+
+<ParamField path="paths.cargo" type="string" default="cargo">
+  Path to `cargo`, used to build Rust packages.
+</ParamField>
+
+<ParamField path="paths.dotnet" type="string" default="dotnet">
+  Path to the `dotnet` CLI, used to build .NET / C# packages.
+</ParamField>
+
+<ParamField path="paths.cmake" type="string" default="cmake">
+  Path to `cmake`, used by the C/C++ driver for CMake-based projects.
+</ParamField>
+
+<ParamField path="paths.make" type="string" default="make">
+  Path to `make`, used by the C/C++ driver for Makefile-based projects.
+</ParamField>
+
+### Binary Cache (`binaryCache.*`)
+
+<ParamField path="binaryCache.enabled" type="boolean" default="false">
+  When `true`, `mntpack sync` checks for a prebuilt binary in the cache repository before falling back to a local build. Also required to use `mntpack prebuild`.
+</ParamField>
+
+<ParamField path="binaryCache.repo" type="string" default="(none — falls back to syncDispatch.repo)">
+  The `owner/repo` used to store and retrieve prebuilt binaries. When unset, mntpack uses `syncDispatch.repo` as the fallback (default: `mntpack/mntpack-index`).
+</ParamField>
+
+### Sync Dispatch (`syncDispatch.*`)
+
+<ParamField path="syncDispatch.enabled" type="boolean" default="false">
+  When `true`, a successful `mntpack sync` sends a `repository_dispatch` event to `syncDispatch.repo`, allowing an external GitHub Actions workflow to react to new installs.
+</ParamField>
+
+<ParamField path="syncDispatch.repo" type="string" default="mntpack/mntpack-index">
+  The `owner/repo` that receives the dispatch event and also acts as the binary cache fallback when `binaryCache.repo` is unset.
+</ParamField>
+
+<ParamField path="syncDispatch.tokenEnv" type="string" default="MNTPACK_SYNC_DISPATCH_TOKEN">
+  The name of the environment variable that holds the GitHub personal access token used to authenticate the dispatch request and binary cache uploads.
+</ParamField>
+
+<ParamField path="syncDispatch.eventType" type="string" default="mntpack_sync">
+  The `event_type` string sent in the `repository_dispatch` payload. Useful for routing in multi-event GitHub Actions workflows.
+</ParamField>
+
+## Examples
+
+<CodeGroup>
+```bash Inspect
+# Print the entire config file
+mntpack config show
+
+# Read individual keys
+mntpack config get defaultOwner
+mntpack config get autoUpdateOnRun
+mntpack config get binaryCache.enabled
+mntpack config get syncDispatch.repo
+```
+
+```bash Set values
+# Change the default GitHub owner
+mntpack config set defaultOwner myorg
+
+# Enable auto-update when running packages via shim
+mntpack config set autoUpdateOnRun true
+
+# Override a tool path
+mntpack config set paths.cmake /usr/local/bin/cmake
+
+# Enable the binary cache and point it at your cache repo
+mntpack config set binaryCache.enabled true
+mntpack config set binaryCache.repo myorg/my-cache-repo
+
+# Configure sync dispatch
+mntpack config set syncDispatch.enabled true
+mntpack config set syncDispatch.repo myorg/mntpack-index
+mntpack config set syncDispatch.tokenEnv MY_GITHUB_TOKEN
+```
+
+```bash Reset
+# Restore all settings to their defaults
+mntpack config reset
+```
+</CodeGroup>
+
+<Note>
+  `mntpack config set` writes directly to `~/.mntpack/config.json`. If `MNTPACK_HOME` is set, the config file at `$MNTPACK_HOME/config.json` is modified instead.
+</Note>
+
+<Warning>
+  `mntpack config reset` replaces the entire config file with defaults. Any custom values — including tool paths, custom owners, and cache settings — will be lost.
+</Warning>
